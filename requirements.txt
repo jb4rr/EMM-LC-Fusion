@@ -2,3 +2,5 @@ torch
 scikit-learn
 scikit-image
 matplotlib
+nibabel
+pandas
