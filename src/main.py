@@ -9,9 +9,9 @@ from utils.preprocessing import LUCASDataset
 def main():
     train_data = LUCASDataset('train_file.csv')
     test_data = LUCASDataset('test_file.csv')
-    #w_sampler = sampler.WeightedRandomSampler(train_data.weights, len(train_data.weights))
-
-    train_loader = DataLoader(train_data, batch_size=4)
+    w_sampler = sampler.WeightedRandomSampler(train_data.weights, len(train_data.weights))
+    print(w_sampler)
+    train_loader = DataLoader(train_data, sampler=w_sampler,batch_size=4)
     test_loader = DataLoader(test_data, batch_size=4)
 
     for i_batch, sample_batched in enumerate(train_loader):
