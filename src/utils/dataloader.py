@@ -1,7 +1,9 @@
 from sys import path
 from src import config
+from skimage import color
 from torch.utils.data import Dataset
 import nibabel as nib
+from nibabel import processing
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -22,8 +24,8 @@ class LUCASDataset(Dataset):
         self.labels = labels.set_index('patient_id').T.to_dict('list')
         self.idx = self.idx = list(self.labels.keys())
         self.task = -2  # Used to Index Column -2 = Cancer
-        self.image_size = np.asarray((256, 256, 256))
-        # Omitting removing samples with smaller size
+        self.image_size = np.asarray((64, 64, 64))
+        # Omitting removing samples with smaller size may cause error
         self.weights = self.weights_balanced()
         # self.transform = transform
 
@@ -37,27 +39,16 @@ class LUCASDataset(Dataset):
         patient = self.idx[idx]
         label = self.labels[patient][self.task]
         image_dir = os.path.join(self.root, "SCANS", str(patient) + ".nii.gz")
-        image = np.array(nib.load(image_dir).dataobj)
-        if any(np.asarray(image.shape) <= self.image_size):
-            dif = self.image_size - image.shape
-            mod = dif % 2
-            dif = dif // 2
-            pad = np.maximum(dif, [0, 0, 0])
-            pad = tuple(zip(pad, pad + mod))
-            image = np.pad(image, pad, 'reflect')
+        image = nib.load(image_dir)
+        # Change to Liao Pre-Processing Steps
+        image = processing.conform(image, out_shape=(64,64,64), voxel_size=(1.0,1.0,1.0))
+        image = np.array(image.dataobj)
 
-        sz = self.image_size[0]
-        if any(np.asarray(image.shape) >= self.image_size):
-            x, y, z = image.shape
-            x = x // 2 - (sz // 2)
-            y = y // 2 - (sz // 2)
-            z = z // 2 - (sz // 2)
-            image = image[x:x + sz, y:y + sz, z:z + sz]
-        # Stats obtained from the MSD dataset
-        image = np.clip(image, a_min=-1024, a_max=326)
-        image = (image - 159.14433291523548) / 323.0573880113456
+        # Stats obtained from the MSD dataset (Removed to stay consistent with no pre-processing for the moment)
+        #image = np.clip(image, a_min=-1024, a_max=326)
+        #image = (image - 159.14433291523548) / 323.0573880113456
 
-        return {'image': np.expand_dims(image, 0), 'label': label}
+        return np.expand_dims(image, 0), float(label)
 
     def weights_balanced(self):
         count = [0] * 2
@@ -78,22 +69,20 @@ class LUCASDataset(Dataset):
 
 def show_slices(slices):
     """ Function to display row of image slices """
-    fig, axes = plt.subplots(1, len(slices))
+    fig, axes = plt.subplots(16, 16)
+
     for i, slice in enumerate(slices):
-        axes[i].imshow(slice.T, cmap="gray", origin="lower")
+        axes[i // 16][i % 16].axis("off")
+        axes[i// 16][i% 16].imshow(slice.T, cmap="gray", origin="lower")
+
+    plt.show()
 
 
 if __name__ == '__main__':
     dataset = LUCASDataset('train_file.csv')
     epi_img_data = dataset[0]['image']
     """ Function to display row of image slices """
-    print(epi_img_data[:, :, :, 50].shape)
-    # slice_0 = epi_img_data[:, :, :, 50]
-    # slice_1 = epi_img_data[:, :, :, 150]
-    # slice_2 = epi_img_data[:, :, :, 250]
-    # show_slices([slice_0, slice_1, slice_2])
-    # plt.suptitle("Center slices for EPI image")
-    # plt.show()
-    # """ TESTING GETTING SLICES"""
-    # create a list of slices
-    # slices = epi_img_data[:, :,:,:]
+    show_slices([epi_img_data[:, :, :, a_slice] for a_slice in range(epi_img_data.shape[-1])])
+
+
+
