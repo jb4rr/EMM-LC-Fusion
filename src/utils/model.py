@@ -12,15 +12,6 @@ import torch
 path.append('utils/')
 
 
-def conv3d_block(in_channels, out_channels):
-    conv_layers = nn.Sequential(
-        nn.Conv3d(in_channels, out_channels, kernel_size=(3, 3, 3), padding=(1, 1, 1)),
-        nn.BatchNorm3d(out_channels),
-        nn.ReLU()
-    )
-    return conv_layers
-
-
 class VGG16(nn.Module):
     def __init__(self, n_classes=2):
         super(VGG16, self).__init__()
@@ -49,8 +40,6 @@ class VGG16(nn.Module):
         self.fc2 = nn.Linear(4096, 4096)
         self.fc3 = nn.Linear(4096, 1)
 
-
-
     def forward(self, x):
         x = F.relu(self.conv1_1(x))
         x = F.relu(self.conv1_2(x))
@@ -78,13 +67,14 @@ class VGG16(nn.Module):
         x = self.fc3(x)
         return x
 
+
 if __name__ == '__main__':
     # Get Sample data
     image = torch.rand((1, 1, 64, 64, 64), device=config.DEVICE)
-    #imin = image.view(64 * 64 * 64, -1)
-    #print(imin.shape)
+    # imin = image.view(64 * 64 * 64, -1)
+    # print(imin.shape)
     # 5D: [batch_size, channels, depth, height, width]
-    #print(f'INPUT SHAPE: {image.shape} \nINPUT TYPE: {type(image)}')
+    # print(f'INPUT SHAPE: {image.shape} \nINPUT TYPE: {type(image)}')
     vgg_model = VGG16().to(config.DEVICE)
     image = image
 

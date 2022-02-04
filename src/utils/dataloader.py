@@ -27,7 +27,7 @@ class LUCASDataset(Dataset):
         self.image_size = np.asarray((64, 64, 64))
         # Omitting removing samples with smaller size may cause error
         self.weights = self.weights_balanced()
-        # self.transform = transform
+        self.transform = transform
 
     def __len__(self):
         return len(self.labels)
@@ -45,8 +45,11 @@ class LUCASDataset(Dataset):
         image = np.array(image.dataobj)
 
         # Stats obtained from the MSD dataset (Removed to stay consistent with no pre-processing for the moment)
-        #image = np.clip(image, a_min=-1024, a_max=326)
-        #image = (image - 159.14433291523548) / 323.0573880113456
+        image = np.clip(image, a_min=-1024, a_max=326)
+        image = (image - 159.14433291523548) / 323.0573880113456
+
+        if self.transform:
+            image = self.transform(image)
 
         return np.expand_dims(image, 0), float(label)
 
@@ -62,9 +65,6 @@ class LUCASDataset(Dataset):
         for idx, val in enumerate(self.idx):
             weight[idx] = weight_per_class[self.labels[val][self.task]]
         return weight
-
-    def transform(self):
-        pass
 
 
 def show_slices(slices):

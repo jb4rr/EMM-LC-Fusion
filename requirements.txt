@@ -1,7 +1,8 @@
 scikit-learn
-scikit-image
+scikit-image~=0.19.1
 matplotlib~=3.5.1
 nibabel~=3.2.1
 pandas~=1.4.0
 numpy~=1.22.1
-torch
+torch~=1.10.2
+torchvision~=0.11.3
