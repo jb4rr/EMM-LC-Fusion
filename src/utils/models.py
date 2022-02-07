@@ -1,4 +1,4 @@
-# Title: model.py
+# Title: models.py
 # Author: James Barrett
 # Date: 31/01/22
 
@@ -67,6 +67,36 @@ class VGG16(nn.Module):
         x = self.fc3(x)
         return x
 
+
+class DenoisingAutoEncoder(nn.Module):
+    '''
+    Ref: https://github.com/pranjaldatta/Denoising-Autoencoder-in-Pytorch/blob/master/DenoisingAutoencoder.ipynb
+    '''
+    def __init__(self):
+        super(DenoisingAutoEncoder, self).__init__()
+        self.encoder = nn.Sequential(
+            nn.Linear(28 * 28, 256),
+            nn.ReLU(True),
+            nn.Linear(256, 128),
+            nn.ReLU(True),
+            nn.Linear(128, 64),
+            nn.ReLU(True)
+
+        )
+
+        self.decoder = nn.Sequential(
+            nn.Linear(64, 128),
+            nn.ReLU(True),
+            nn.Linear(128, 256),
+            nn.ReLU(True),
+            nn.Linear(256, 28 * 28),
+            nn.Sigmoid(),
+        )
+
+    def forward(self, x):
+        x = self.encoder(x)
+        out = self.decoder(x)
+        return out
 
 if __name__ == '__main__':
     # Get Sample data

@@ -8,7 +8,7 @@ import torch.optim as optim
 from torchvision import transforms
 from torch.utils.data import DataLoader, sampler
 from utils.dataloader import LUCASDataset
-from utils.model import VGG16
+from utils.models import VGG16
 from utils.preprocessing import LiaoTransform
 
 

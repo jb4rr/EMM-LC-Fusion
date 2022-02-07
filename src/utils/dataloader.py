@@ -2,7 +2,6 @@ from sys import path
 from src import config
 from skimage import color
 from torch.utils.data import Dataset
-import nibabel as nib
 from nibabel import processing
 import os
 import pandas as pd
@@ -39,17 +38,8 @@ class LUCASDataset(Dataset):
         patient = self.idx[idx]
         label = self.labels[patient][self.task]
         image_dir = os.path.join(self.root, "SCANS", str(patient) + ".nii.gz")
-        image = nib.load(image_dir)
-        # Change to Liao Pre-Processing Steps
-        image = processing.conform(image, out_shape=(64,64,64), voxel_size=(1.0,1.0,1.0))
-        image = np.array(image.dataobj)
-
-        # Stats obtained from the MSD dataset (Removed to stay consistent with no pre-processing for the moment)
-        image = np.clip(image, a_min=-1024, a_max=326)
-        image = (image - 159.14433291523548) / 323.0573880113456
-
         if self.transform:
-            image = self.transform(image)
+            image = self.transform(image_dir)
 
         return np.expand_dims(image, 0), float(label)
 
