@@ -7,5 +7,5 @@ else:
 
 DATA_DIR = r"D:\University of Gloucestershire\Year 4\Dissertation"
 BATCH_SIZE = 4
-IMAGE_SIZE = np.asarray((256, 256, 256))
+IMAGE_SIZE = np.asarray((450, 450, 450))
 N_CLASSES = 2

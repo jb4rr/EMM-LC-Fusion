@@ -4,38 +4,24 @@
 
 # Description: Adopts the preprocessing steps defined by Liao et al. (2019) for KDSB17
 
-# Save Pre-Processed Images as NPY to reduce training time
-
+sample_num = 64
+import matplotlib.pyplot as plt
 import numpy as np
 import nibabel as nib
-from nibabel import processing
-from nilearn.image import resample_img
-import scipy.ndimage
-from math import prod
-from sys import path
 import os
-p = os.path.abspath('..')
-path.insert(1, p)
-import matplotlib.pyplot as plt
-from skimage import measure, morphology
-import config
+import scipy.ndimage
+import warnings
+
+from sys import path
+from src import config
+from PIL import Image
+from sys import path
+from skimage import measure
 from scipy.ndimage.morphology import binary_dilation,generate_binary_structure
 from skimage.morphology import convex_hull_image
 from scipy.ndimage.interpolation import zoom
-import warnings
 
-def resampleing(orig_nii):
-    target_shape = np.array((256,256,256))
-    new_resolution = [2, ] * 3
-    new_affine = np.zeros((4, 4))
-    new_affine[:3, :3] = np.diag(new_resolution)
-    new_affine = orig_nii.affine*256
-    # putting point 0,0,0 in the middle of the new volume - this could be refined in the future
-    new_affine[:3, 3] = target_shape * new_resolution / 2. * -1
-    new_affine[3, 3] = 1.
-    downsampled_and_cropped_nii = resample_img(orig_nii, target_affine=new_affine, target_shape=target_shape, interpolation='nearest')
-    print(downsampled_and_cropped_nii.affine)
-    return downsampled_and_cropped_nii
+path.append('utils/')
 
 def binarize_per_slice(image, spacing, intensity_th=-600, sigma=1, area_th=30, eccen_th=0.99, bg_patch_size=10):
     bw = np.zeros(image.shape, dtype=bool)
@@ -68,10 +54,8 @@ def binarize_per_slice(image, spacing, intensity_th=-600, sigma=1, area_th=30, e
     return bw
 
 
-def all_slice_analysis(bw, spacing, cut_num=0, vol_limit=None, area_th=6e3, dist_th=62):
+def all_slice_analysis(bw, spacing, cut_num=0, vol_limit=[0.68, 8.2], area_th=6e3, dist_th=62):
     # in some cases, several top layers need to be removed first
-    if vol_limit is None:
-        vol_limit = [0.68, 8.2]
     if cut_num > 0:
         bw0 = np.copy(bw)
         bw[-cut_num:] = False
@@ -87,7 +71,7 @@ def all_slice_analysis(bw, spacing, cut_num=0, vol_limit=None, area_th=6e3, dist
     # select components based on volume
     properties = measure.regionprops(label)
     for prop in properties:
-        if prop.area * prod(spacing) < vol_limit[0] * 1e6 or prop.area * prod(spacing) > vol_limit[1] * 1e6:
+        if prop.area * spacing.prod() < vol_limit[0] * 1e6 or prop.area * spacing.prod() > vol_limit[1] * 1e6:
             label[label == prop.label] = 0
 
     # prepare a distance map for further analysis
@@ -229,6 +213,9 @@ def mask_extraction(scan, slices):
     # Remove if avg min distance > 62mm
     # Union remaining components for the final mask
     spacing = scan.header.get_zooms()
+    spacing = np.array(spacing, dtype=np.float32)
+    print("shape")
+    print(slices[0].shape)
     bw = binarize_per_slice(slices, spacing)
     flag = 0
     cut_num = 0
@@ -286,13 +273,9 @@ def lumTrans(img):
 
 def resample(imgs, spacing, new_spacing,order = 2):
     if len(imgs.shape)==3:
-        # MODIFIED LINE BELOW
-        new_shape = np.round(tuple(m * s / r for m, s, r in zip(imgs.shape, spacing, new_spacing)))
-        #new_shape = np.round(imgs.shape * spacing / new_spacing)
-        true_spacing = tuple(s * i / n for s, i, n in zip(spacing, imgs.shape, new_shape))
-        #true_spacing = spacing * imgs.shape / new_shape
-        resize_factor = tuple(n / i for n, i in zip(new_shape, imgs.shape))
-        #resize_factor = new_shape / imgs.shape
+        new_shape = np.round(imgs.shape * spacing / new_spacing)
+        true_spacing = spacing * imgs.shape / new_shape
+        resize_factor = new_shape / imgs.shape
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             imgs = zoom(imgs, resize_factor, mode = 'nearest',order=order)
@@ -305,7 +288,7 @@ def resample(imgs, spacing, new_spacing,order = 2):
             newslice,true_spacing = resample(slice,spacing,new_spacing)
             newimg.append(newslice)
         newimg=np.transpose(np.array(newimg),[1,2,3,0])
-        return newimg, true_spacing
+        return newimg,true_spacing
     else:
         raise ValueError('wrong shape')
 
@@ -323,69 +306,70 @@ class LiaoTransform(object):
         :param path: str path of scan
         :return: processed image
         """
+        exampled_preprocessing = []
         # Convert to Houndsfield Unit Scale [Already Handled By Nibabel.Load()]
         print("Loading Scan")
         self.scan = nib.load(scan_path)
-        pre = self.scan.get_fdata()[:, :, 100]
-        self.scan = resampleing(self.scan)
-        post = self.scan.get_fdata()[:, :, 100]
+        exampled_preprocessing.append(self.scan.get_fdata()[:, :, sample_num])
         self.slices = self.scan.get_fdata()
-        show_slices([pre, post], total_cols=2)
-        # Resizing
-
+        # ADD RESIZE
+        self.slices = np.stack([(self.slices[:,:,s]) for s in range(self.slices.shape[-1])])
+        self.slices = self.slices.astype(np.int16)
+        exampled_preprocessing.append(self.slices[sample_num])
+        # self.scan = processing.conform(self.scan, out_shape=config.IMAGE_SIZE, order=1)
         # Mask Extraction
         print("Extracting Mask")
         m1, m2, spacing = mask_extraction(self.scan, self.slices)
         resolution = np.array([1, 1, 1])
-        self.Mask = m1 + m2
-        if self.Mask.any():
-            self.extendbox = extend_box(self.Mask, spacing, resolution)
+        Mask = m1 + m2
 
-            # Convex Hull and Dilation
-            print("Convex Hull and Dilation")
-            # Divide the scan into 2 parts (left / right)
-            # Iteratively erode each side to the same volume
-            # Dilate both components back to original size
-            # Intersection with raw mask is now for two lungs seperately
-            # Replace each 2d slice with convex hull
-            # Dilate by further 10 voxels
-            # if convex hull of 2d slice is > 1.5 times the original mask is kept
-            convex_mask = m1
-            dm1 = process_mask(m1)
-            dm2 = process_mask(m2)
-            dilatedMask = dm1 + dm2
-            Mask = m1 + m2
-            extramask = dilatedMask ^ Mask
-            # transform from HU to uint8
-            # clip data from [-1200, 600]
-            # linearly transform to [0,255]
-            # Apply Mask (Multiply)
-            # Everything outside mask fill with 170
-            # All Values greater than 210 replaced with 170
-            # fill bones with 170
-            bone_thresh = 210
-            pad_value = 170
+        newshape = np.round(np.array(Mask.shape) * spacing / resolution)
+        xx, yy, zz = np.where(Mask)
+        box = np.array([[np.min(xx), np.max(xx)], [np.min(yy), np.max(yy)], [np.min(zz), np.max(zz)]])
+        box = box * np.expand_dims(spacing, 1) / np.expand_dims(resolution, 1)
+        box = np.floor(box).astype('int')
+        margin = 5
+        extendbox = np.vstack(
+            [np.max([[0, 0, 0], box[:, 0] - margin], 0), np.min([newshape, box[:, 1] + 2 * margin], axis=0).T]).T
+        extendbox = extendbox.astype('int')
 
-            self.slices[np.isnan(self.slices)] = -2000
-            sliceim = lumTrans(self.slices)
-            sliceim = sliceim * dilatedMask + pad_value * (1 - dilatedMask).astype('uint8')
-            bones = sliceim * extramask > bone_thresh
-            sliceim[bones] = pad_value
-            print(f"sliceim Shape: {sliceim.shape}")
-            show_slices(sliceim[100:116], total_cols=4)
-            sliceim1, _ = resample(sliceim, spacing, resolution, order=1)
-            sliceim2 = sliceim1[self.extendbox[0, 0]:self.extendbox[0, 1],
-                       self.extendbox[1, 0]:self.extendbox[1, 1],
-                       self.extendbox[2, 0]:self.extendbox[2, 1]]
-            sliceim = sliceim2[np.newaxis, ...]
-            print(f"sliceim Shape: {sliceim.shape}")
-            show_slices(sliceim[100:116], total_cols=4)
-        else:
-            warnings.warn("Mask has no value")
+        convex_mask = m1
+        dm1 = process_mask(m1)
+        dm2 = process_mask(m2)
+        dilatedMask = dm1 + dm2
+        Mask = m1 + m2
+        extramask = dilatedMask ^ Mask
+        bone_thresh = 210
+        pad_value = 170
+
+        self.slices[np.isnan(self.slices)] = -2000
+        sliceim = lumTrans(self.slices)
+        sliceim = sliceim * dilatedMask + pad_value * (1 - dilatedMask).astype('uint8')
+        bones = sliceim * extramask > bone_thresh
+        sliceim[bones] = pad_value
+        exampled_preprocessing.append(sliceim[sample_num])
+        sliceim1, _ = resample(sliceim, spacing, resolution, order=1)
+        sliceim2 = sliceim1[extendbox[0, 0]:extendbox[0, 1],
+                   extendbox[1, 0]:extendbox[1, 1],
+                   extendbox[2, 0]:extendbox[2, 1]]
+        #sliceim = sliceim2[np.newaxis, ...]
+        print(sliceim2.shape)
+        exampled_preprocessing.append(sliceim2[sample_num])
+        exampled_preprocessing.append(sliceim[sample_num])
+        self.slices = sliceim
+        print("Finished... Outputting Results")
+        show_slices(exampled_preprocessing, total_cols=len(exampled_preprocessing))
+        #self.save_as_numpy(scan_path)
         return self.scan
 
+    def save_as_numpy(self, path):
+        name = path.split('\\')[-1]
+        name = name.split('.')[0]
+        prep_folder = os.path.join(config.DATA_DIR, "Preprocessed")
+        print(f"Saved as {name} in {prep_folder}")
+        np.save(os.path.join(prep_folder, name), self.slices)
 
-def show_slices(slices, total_cols=2):
+def show_slices(slices, total_cols=6):
     """
         Function to display row of image slices
         ref: https://towardsdatascience.com/dynamic-subplot-layout-in-seaborn-e777500c7386
@@ -393,7 +377,7 @@ def show_slices(slices, total_cols=2):
     """
     num_plots = len(slices)
     total_rows = num_plots // total_cols + 1
-    _, axs = plt.subplots(total_rows, total_cols, figsize=(7 * total_cols, 7 * total_rows))
+    _, axs = plt.subplots(total_rows, total_cols)
     axs = axs.flatten()
     for img, ax in zip(slices, axs):
         ax.axis("off")
@@ -401,5 +385,5 @@ def show_slices(slices, total_cols=2):
     plt.show()
 
 if __name__ == "__main__":
-    path = r'D:\University of Gloucestershire\Year 4\Dissertation\SCANS\4041740.nii.gz'
+    path = r'D:\University of Gloucestershire\Year 4\Dissertation\SCANS\4139516.nii.gz'
     preprocess = LiaoTransform()(path)
