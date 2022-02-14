@@ -6,6 +6,7 @@ from nibabel import processing
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
+import nibabel as nib
 import numpy as np
 import torch
 
@@ -17,8 +18,9 @@ class LUCASDataset(Dataset):
         Description: Custom DataLoader for LUCAS Dataset
     '''
 
-    def __init__(self, csv_file, transform=None):
+    def __init__(self, csv_file, transform=None, preprocessed=False):
         self.root = config.DATA_DIR
+        self.preprocessed = preprocessed
         labels = pd.read_csv(os.path.join(self.root, csv_file))
         self.labels = labels.set_index('patient_id').T.to_dict('list')
         self.idx = self.idx = list(self.labels.keys())
@@ -37,12 +39,19 @@ class LUCASDataset(Dataset):
 
         patient = self.idx[idx]
         label = self.labels[patient][self.task]
-        image_dir = os.path.join(self.root, "SCANS", str(patient) + ".nii.gz")
-        if self.transform:
-            image = self.transform(image_dir)
-        #show_slices(image[0,20:56,:,:], total_cols=6)
 
-        return image, float(label)
+        if self.preprocessed == True:
+            image_dir = os.path.join(self.root, "Preprocessed", str(patient) + ".npy")
+            scan = np.load(image_dir)
+        else:
+            image_dir = os.path.join(self.root, "SCANS", str(patient) + ".nii.gz")
+            scan = nib.load(image_dir)
+
+        if self.transform:
+            scan = self.transform(scan)
+        show_slices(scan[0,20:56,:,:], total_cols=6)
+
+        return scan, float(label)
 
     def weights_balanced(self):
         count = [0] * 2

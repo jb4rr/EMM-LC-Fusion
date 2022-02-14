@@ -10,11 +10,10 @@ from torchvision import transforms
 from torch.utils.data import DataLoader, sampler
 from utils.dataloader import LUCASDataset
 from utils.models import VGG16
-from utils.preprocessing import LiaoTransform
 
 
 def main():
-    train_data = LUCASDataset('train_file.csv', transform=transforms.Compose([LiaoTransform(), Resize((64,64,64))]))
+    train_data = LUCASDataset('train_file.csv', preprocessed=True, transform=transforms.Compose([Resize((64,64,64))]))
     test_data = LUCASDataset('test_file.csv')
     w_sampler = sampler.WeightedRandomSampler(train_data.weights, len(train_data.weights))
     train_loader = DataLoader(train_data, sampler=w_sampler, batch_size=config.BATCH_SIZE)

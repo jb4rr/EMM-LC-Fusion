@@ -13,6 +13,7 @@ import scipy.ndimage
 import warnings
 from PIL import Image
 from nilearn.image import resample_img
+from numba import jit, cuda
 from pathlib import Path as Plib
 from src import config
 from sys import path
@@ -22,6 +23,7 @@ from skimage.morphology import convex_hull_image
 from scipy.ndimage.interpolation import zoom
 sample_factor = 0.5
 path.append('utils/')
+
 
 def binarize_per_slice(image, spacing, intensity_th=-600, sigma=1, area_th=30, eccen_th=0.99, bg_patch_size=10):
     bw = np.zeros(image.shape, dtype=bool)
@@ -300,7 +302,9 @@ class LiaoTransform(object):
         """
 
         # get slices
-    def __call__(self, scan_path, save=False):
+
+
+    def __call__(self, scan, save=''):
         """
         :param path: str path of scan
         :return: processed image
@@ -308,8 +312,7 @@ class LiaoTransform(object):
         exampled_preprocessing = []
         resolution = np.array([1, 1, 1])
         # -------------------------------------------------------------------------------------------------------#
-        print(f"Loading Scan: {scan_path}")
-        self.scan = nib.load(scan_path)
+        self.scan = scan
         # -------------------------------------------------------------------------------------------------------#
         #                                         RESIZE OF SCAN Factor=0.25
         print(f"Scan Size: {self.scan.get_fdata().shape} \nHeader: {self.scan.header.get_zooms()}")
@@ -370,7 +373,8 @@ class LiaoTransform(object):
         #    im = Image.fromarray((self.slices[i]))
         #    im.save(f'./test/image-{i}.png')
         # --------------------------------------------If SAVE = True -----------------------------------------------#
-        self.save_as_numpy(str(scan_path))
+        if save:
+            self.save_as_numpy((save))
         return self.slices
 
     def save_as_numpy(self, path):
@@ -405,15 +409,15 @@ def load_numpy():
     show_slices([slices[0,40, : , :]], total_cols=1)
 
 if __name__ == "__main__":
-    scans_dir = r'D:\University of Gloucestershire\Year 4\Dissertation\SCANS'
+    scans_dir = str(os.path.join(config.DATA_DIR, "SCANS"))
+    saved_dir = str(os.path.join(config.DATA_DIR, "Preprocessed"))
     preprocessor = LiaoTransform()
     files = Plib(scans_dir).glob('*')
-    saved_dir = r'D:\University of Gloucestershire\Year 4\Dissertation\Preprocessed'
     for f in files:
         name = str(f).split("\\")[-1].split('.')[0] + ".npy"
         saved_path = str(os.path.join(saved_dir, name))
         if not os.path.exists(saved_path):
-            preprocessor(f, save=True)
+            preprocessor(nib.load(f), save=str(f))
         else:
             print(f"{f} already processed")
     # Add steps to preprocess entire dataset
