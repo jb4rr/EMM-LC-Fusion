@@ -4,23 +4,22 @@
 
 # Description: Adopts the preprocessing steps defined by Liao et al. (2019) for KDSB17
 
-sample_num = 64
+
 import matplotlib.pyplot as plt
 import numpy as np
 import nibabel as nib
 import os
 import scipy.ndimage
 import warnings
-
-from sys import path
-from src import config
 from PIL import Image
+from nilearn.image import resample_img
+from src import config
 from sys import path
 from skimage import measure
 from scipy.ndimage.morphology import binary_dilation,generate_binary_structure
 from skimage.morphology import convex_hull_image
 from scipy.ndimage.interpolation import zoom
-
+sample_factor = 0.5
 path.append('utils/')
 
 def binarize_per_slice(image, spacing, intensity_th=-600, sigma=1, area_th=30, eccen_th=0.99, bg_patch_size=10):
@@ -214,8 +213,6 @@ def mask_extraction(scan, slices):
     # Union remaining components for the final mask
     spacing = scan.header.get_zooms()
     spacing = np.array(spacing, dtype=np.float32)
-    print("shape")
-    print(slices[0].shape)
     bw = binarize_per_slice(slices, spacing)
     flag = 0
     cut_num = 0
@@ -233,7 +230,6 @@ def mask_extraction(scan, slices):
 
 
 def extend_box(mask, spacing, resolution):
-    # MODIFIED LINE BELOW
     newshape = np.round(np.array(mask.shape) * spacing / resolution)
     xx, yy, zz = np.where(mask)
     box = np.array([[np.min(xx), np.max(xx)], [np.min(yy), np.max(yy)], [np.min(zz), np.max(zz)]])
@@ -272,8 +268,10 @@ def lumTrans(img):
 
 
 def resample(imgs, spacing, new_spacing,order = 2):
+    print(f"||RESAMPLE||\nIMAGE SHAPE: {imgs.shape}")
     if len(imgs.shape)==3:
         new_shape = np.round(imgs.shape * spacing / new_spacing)
+        print(f"NEW SHAPE: {new_shape}")
         true_spacing = spacing * imgs.shape / new_shape
         resize_factor = new_shape / imgs.shape
         with warnings.catch_warnings():
@@ -307,22 +305,27 @@ class LiaoTransform(object):
         :return: processed image
         """
         exampled_preprocessing = []
-        # Convert to Houndsfield Unit Scale [Already Handled By Nibabel.Load()]
-        print("Loading Scan")
-        self.scan = nib.load(scan_path)
-        exampled_preprocessing.append(self.scan.get_fdata()[:, :, sample_num])
-        self.slices = self.scan.get_fdata()
-        # ADD RESIZE
-        self.slices = np.stack([(self.slices[:,:,s]) for s in range(self.slices.shape[-1])])
-        self.slices = self.slices.astype(np.int16)
-        exampled_preprocessing.append(self.slices[sample_num])
-        # self.scan = processing.conform(self.scan, out_shape=config.IMAGE_SIZE, order=1)
-        # Mask Extraction
-        print("Extracting Mask")
-        m1, m2, spacing = mask_extraction(self.scan, self.slices)
         resolution = np.array([1, 1, 1])
+        # -------------------------------------------------------------------------------------------------------#
+        print(f"Loading Scan: {scan_path}")
+        self.scan = nib.load(scan_path)
+        # -------------------------------------------------------------------------------------------------------#
+        #                                         RESIZE OF SCAN Factor=0.25
+        print(f"Scan Size: {self.scan.get_fdata().shape} \nHeader: {self.scan.header.get_zooms()}")
+        self.scan = resample_img(self.scan, target_affine=np.eye(3)*2, interpolation='nearest')
+        print(f"Resized to {self.scan.get_fdata().shape} \nHeader: {self.scan.header.get_zooms()}")
+        # -------------------------------------------------------------------------------------------------------#
+        #                                           GET SLICES
+        self.slices = self.scan.get_fdata()
+        self.slices = np.stack([(self.slices[:, :, s]) for s in range(self.slices.shape[-1])])
+        self.slices = self.slices.astype(np.int16)
+        exampled_preprocessing.append(self.scan.get_fdata()[:, :, int(sample_factor * self.slices.shape[0])])
+        # -------------------------------------------------------------------------------------------------------#
+        #                                           CREATE MASK
+        m1, m2, spacing = mask_extraction(self.scan, self.slices)
         Mask = m1 + m2
-
+        print(f"Mask: {Mask.shape}")
+        # -------------------------------------------------------------------------------------------------------#
         newshape = np.round(np.array(Mask.shape) * spacing / resolution)
         xx, yy, zz = np.where(Mask)
         box = np.array([[np.min(xx), np.max(xx)], [np.min(yy), np.max(yy)], [np.min(zz), np.max(zz)]])
@@ -333,7 +336,6 @@ class LiaoTransform(object):
             [np.max([[0, 0, 0], box[:, 0] - margin], 0), np.min([newshape, box[:, 1] + 2 * margin], axis=0).T]).T
         extendbox = extendbox.astype('int')
 
-        convex_mask = m1
         dm1 = process_mask(m1)
         dm2 = process_mask(m2)
         dilatedMask = dm1 + dm2
@@ -347,20 +349,28 @@ class LiaoTransform(object):
         sliceim = sliceim * dilatedMask + pad_value * (1 - dilatedMask).astype('uint8')
         bones = sliceim * extramask > bone_thresh
         sliceim[bones] = pad_value
-        exampled_preprocessing.append(sliceim[sample_num])
+        exampled_preprocessing.append(sliceim[int(sample_factor*self.slices.shape[0])])
+
+        # -----------------------------------------------Crop-----------------------------------------------------#
+
         sliceim1, _ = resample(sliceim, spacing, resolution, order=1)
+
         sliceim2 = sliceim1[extendbox[0, 0]:extendbox[0, 1],
                    extendbox[1, 0]:extendbox[1, 1],
                    extendbox[2, 0]:extendbox[2, 1]]
-        #sliceim = sliceim2[np.newaxis, ...]
-        print(sliceim2.shape)
-        exampled_preprocessing.append(sliceim2[sample_num])
-        exampled_preprocessing.append(sliceim[sample_num])
+
+        exampled_preprocessing.append(sliceim2[int(sample_factor*self.slices.shape[0])])
+
+        # -------------------------------------------FINAL DOWNSAMPLE ---------------------------------------------#
+
         self.slices = sliceim
         print("Finished... Outputting Results")
-        show_slices(exampled_preprocessing, total_cols=len(exampled_preprocessing))
-        #self.save_as_numpy(scan_path)
-        return self.scan
+        #show_slices(exampled_preprocessing, total_cols=len(exampled_preprocessing))
+        #for i in range(self.slices.shape[0]-1):
+        #    im = Image.fromarray((self.slices[i]))
+        #    im.save(f'./test/image-{i}.png')
+
+        return self.slices
 
     def save_as_numpy(self, path):
         name = path.split('\\')[-1]
@@ -381,6 +391,7 @@ def show_slices(slices, total_cols=6):
     axs = axs.flatten()
     for img, ax in zip(slices, axs):
         ax.axis("off")
+        ax.set_axis_off()
         ax.imshow(img, cmap="gray")
     plt.show()
 

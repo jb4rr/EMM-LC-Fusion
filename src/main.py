@@ -5,6 +5,7 @@ import config
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torchio.transforms import Resample
 from torchvision import transforms
 from torch.utils.data import DataLoader, sampler
 from utils.dataloader import LUCASDataset
@@ -13,7 +14,7 @@ from utils.preprocessing import LiaoTransform
 
 
 def main():
-    train_data = LUCASDataset('train_file.csv', transform=transforms.Compose([LiaoTransform()]))
+    train_data = LUCASDataset('train_file.csv', transform=transforms.Compose([LiaoTransform(), Resample(64,64,64)]))
     test_data = LUCASDataset('test_file.csv')
     w_sampler = sampler.WeightedRandomSampler(train_data.weights, len(train_data.weights))
     train_loader = DataLoader(train_data, sampler=w_sampler, batch_size=config.BATCH_SIZE)
