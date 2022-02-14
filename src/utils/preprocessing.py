@@ -13,6 +13,7 @@ import scipy.ndimage
 import warnings
 from PIL import Image
 from nilearn.image import resample_img
+from pathlib import Path as Plib
 from src import config
 from sys import path
 from skimage import measure
@@ -299,7 +300,7 @@ class LiaoTransform(object):
         """
 
         # get slices
-    def __call__(self, scan_path):
+    def __call__(self, scan_path, save=False):
         """
         :param path: str path of scan
         :return: processed image
@@ -325,6 +326,7 @@ class LiaoTransform(object):
         m1, m2, spacing = mask_extraction(self.scan, self.slices)
         Mask = m1 + m2
         print(f"Mask: {Mask.shape}")
+        exampled_preprocessing.append(Mask[int(sample_factor * self.slices.shape[0]), :, :])
         # -------------------------------------------------------------------------------------------------------#
         newshape = np.round(np.array(Mask.shape) * spacing / resolution)
         xx, yy, zz = np.where(Mask)
@@ -350,18 +352,16 @@ class LiaoTransform(object):
         bones = sliceim * extramask > bone_thresh
         sliceim[bones] = pad_value
         exampled_preprocessing.append(sliceim[int(sample_factor*self.slices.shape[0])])
-
         # -----------------------------------------------Crop-----------------------------------------------------#
+        #sliceim1, _ = resample(sliceim, spacing, resolution, order=1)
 
-        sliceim1, _ = resample(sliceim, spacing, resolution, order=1)
-
-        sliceim2 = sliceim1[extendbox[0, 0]:extendbox[0, 1],
-                   extendbox[1, 0]:extendbox[1, 1],
-                   extendbox[2, 0]:extendbox[2, 1]]
-        exampled_preprocessing.append(sliceim2[int(sample_factor*self.slices.shape[0])])
+        #sliceim2 = sliceim1[extendbox[0, 0]:extendbox[0, 1],
+        #           extendbox[1, 0]:extendbox[1, 1],
+        #           extendbox[2, 0]:extendbox[2, 1]]
+        #print(sliceim2.shape)
+        #exampled_preprocessing.append(sliceim2[int(sample_factor*self.slices.shape[0])])
 
         # -------------------------------------------FINAL DOWNSAMPLE ---------------------------------------------#
-
         self.slices = sliceim[np.newaxis,...]
         print(f"SLICEIMSHAPE: {self.slices.shape}")
         #print("Finished... Outputting Results")
@@ -369,7 +369,8 @@ class LiaoTransform(object):
         #for i in range(self.slices.shape[0]-1):
         #    im = Image.fromarray((self.slices[i]))
         #    im.save(f'./test/image-{i}.png')
-
+        # --------------------------------------------If SAVE = True -----------------------------------------------#
+        self.save_as_numpy(str(scan_path))
         return self.slices
 
     def save_as_numpy(self, path):
@@ -389,12 +390,30 @@ def show_slices(slices, total_cols=6):
     total_rows = num_plots // total_cols + 1
     _, axs = plt.subplots(total_rows, total_cols)
     axs = axs.flatten()
-    for img, ax in zip(slices, axs):
+    titles=["Original"]#, "Mask", "Output"]
+    for img, ax, title in zip(slices, axs, titles):
         ax.axis("off")
+        ax.title.set_text(title)
         ax.set_axis_off()
         ax.imshow(img, cmap="gray")
     plt.show()
 
+
+def load_numpy():
+    slices = np.load(r'D:\University of Gloucestershire\Year 4\Dissertation\Preprocessed\4016910.npy')
+    print(slices.shape)
+    show_slices([slices[0,40, : , :]], total_cols=1)
+
 if __name__ == "__main__":
-    path = r'D:\University of Gloucestershire\Year 4\Dissertation\SCANS\4139516.nii.gz'
-    preprocess = LiaoTransform()(path)
+    scans_dir = r'D:\University of Gloucestershire\Year 4\Dissertation\SCANS'
+    preprocessor = LiaoTransform()
+    files = Plib(scans_dir).glob('*')
+    saved_dir = r'D:\University of Gloucestershire\Year 4\Dissertation\Preprocessed'
+    for f in files:
+        name = str(f).split("\\")[-1].split('.')[0] + ".npy"
+        saved_path = str(os.path.join(saved_dir, name))
+        if not os.path.exists(saved_path):
+            preprocessor(f, save=True)
+        else:
+            print(f"{f} already processed")
+    # Add steps to preprocess entire dataset
