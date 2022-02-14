@@ -312,7 +312,7 @@ class LiaoTransform(object):
         # -------------------------------------------------------------------------------------------------------#
         #                                         RESIZE OF SCAN Factor=0.25
         print(f"Scan Size: {self.scan.get_fdata().shape} \nHeader: {self.scan.header.get_zooms()}")
-        self.scan = resample_img(self.scan, target_affine=np.eye(3)*2, interpolation='nearest')
+        self.scan = resample_img(self.scan, target_affine=self.scan.affine/0.5, interpolation='nearest')
         print(f"Resized to {self.scan.get_fdata().shape} \nHeader: {self.scan.header.get_zooms()}")
         # -------------------------------------------------------------------------------------------------------#
         #                                           GET SLICES
@@ -358,13 +358,13 @@ class LiaoTransform(object):
         sliceim2 = sliceim1[extendbox[0, 0]:extendbox[0, 1],
                    extendbox[1, 0]:extendbox[1, 1],
                    extendbox[2, 0]:extendbox[2, 1]]
-
         exampled_preprocessing.append(sliceim2[int(sample_factor*self.slices.shape[0])])
 
         # -------------------------------------------FINAL DOWNSAMPLE ---------------------------------------------#
 
-        self.slices = sliceim
-        print("Finished... Outputting Results")
+        self.slices = sliceim[np.newaxis,...]
+        print(f"SLICEIMSHAPE: {self.slices.shape}")
+        #print("Finished... Outputting Results")
         #show_slices(exampled_preprocessing, total_cols=len(exampled_preprocessing))
         #for i in range(self.slices.shape[0]-1):
         #    im = Image.fromarray((self.slices[i]))

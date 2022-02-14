@@ -3,7 +3,6 @@ from src import config
 from skimage import color
 from torch.utils.data import Dataset
 from nibabel import processing
-
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -41,8 +40,9 @@ class LUCASDataset(Dataset):
         image_dir = os.path.join(self.root, "SCANS", str(patient) + ".nii.gz")
         if self.transform:
             image = self.transform(image_dir)
+        #show_slices(image[0,20:56,:,:], total_cols=6)
 
-        return np.expand_dims(image, 0), float(label)
+        return image, float(label)
 
     def weights_balanced(self):
         count = [0] * 2
@@ -58,14 +58,20 @@ class LUCASDataset(Dataset):
         return weight
 
 
-def show_slices(slices):
-    """ Function to display row of image slices """
-    fig, axes = plt.subplots(16, 16)
-
-    for i, slice in enumerate(slices):
-        axes[i // 16][i % 16].axis("off")
-        axes[i// 16][i% 16].imshow(slice.T, cmap="gray", origin="lower")
-
+def show_slices(slices, total_cols=6):
+    """
+        Function to display row of image slices
+        ref: https://towardsdatascience.com/dynamic-subplot-layout-in-seaborn-e777500c7386
+        author: Daniel Deutsch
+    """
+    num_plots = len(slices)
+    total_rows = num_plots // total_cols + 1
+    _, axs = plt.subplots(total_rows, total_cols)
+    axs = axs.flatten()
+    for img, ax in zip(slices, axs):
+        ax.axis("off")
+        ax.set_axis_off()
+        ax.imshow(img, cmap="gray")
     plt.show()
 
 
