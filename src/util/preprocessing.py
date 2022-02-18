@@ -4,7 +4,6 @@
 
 # Description: Adopts the preprocessing steps defined by Liao et al. (2019) for KDSB17
 
-
 import matplotlib.pyplot as plt
 import numpy as np
 import nibabel as nib
@@ -14,6 +13,7 @@ import warnings
 from PIL import Image
 from nilearn.image import resample_img
 from numba import jit, cuda
+from tqdm import tqdm
 from pathlib import Path as Plib
 from src import config
 from sys import path
@@ -22,7 +22,7 @@ from scipy.ndimage.morphology import binary_dilation,generate_binary_structure
 from skimage.morphology import convex_hull_image
 from scipy.ndimage.interpolation import zoom
 sample_factor = 0.5
-path.append('utils/')
+path.append('util/')
 
 
 def binarize_per_slice(image, spacing, intensity_th=-600, sigma=1, area_th=30, eccen_th=0.99, bg_patch_size=10):
@@ -342,33 +342,32 @@ class LiaoTransform(object):
             [np.max([[0, 0, 0], box[:, 0] - margin], 0), np.min([newshape, box[:, 1] + 2 * margin], axis=0).T]).T
         extendbox = extendbox.astype('int')
 
-        #dm1 = process_mask(m1)
-        #dm2 = process_mask(m2)
-        #dilatedMask = dm1 + dm2
-        #Mask = m1 + m2
-        #extramask = dilatedMask ^ Mask
-        #bone_thresh = 210
-        #pad_value = 170
-
-        #self.slices[np.isnan(self.slices)] = -2000
-        #sliceim = lumTrans(self.slices)
-        #sliceim = sliceim * dilatedMask + pad_value * (1 - dilatedMask).astype('uint8')
-        #bones = sliceim * extramask > bone_thresh
-        #sliceim[bones] = pad_value
-        #exampled_preprocessing.append(sliceim[int(sample_factor*self.slices.shape[0])])
+        dm1 = process_mask(m1)
+        dm2 = process_mask(m2)
+        dilatedMask = dm1 + dm2
+        Mask = m1 + m2
+        extramask = dilatedMask ^ Mask
+        bone_thresh = 210
+        pad_value = 170
+        self.slices[np.isnan(self.slices)] = -2000
+        sliceim = lumTrans(self.slices)
+        sliceim = sliceim * dilatedMask + pad_value * (1 - dilatedMask).astype('uint8')
+        bones = sliceim * extramask > bone_thresh
+        sliceim[bones] = pad_value
+        exampled_preprocessing.append(sliceim[int(sample_factor*self.slices.shape[0])])
         # -----------------------------------------------Crop-----------------------------------------------------#
-        #sliceim1, _ = resample(sliceim, spacing, resolution, order=1)
+        sliceim1, _ = resample(sliceim, spacing, resolution, order=1)
 
-        #sliceim2 = sliceim1[extendbox[0, 0]:extendbox[0, 1],
-        #           extendbox[1, 0]:extendbox[1, 1],
-        #           extendbox[2, 0]:extendbox[2, 1]]
-        #print(sliceim2.shape)
-        #exampled_preprocessing.append(sliceim2[int(sample_factor*self.slices.shape[0])])
+        sliceim2 = sliceim1[extendbox[0, 0]:extendbox[0, 1],
+                   extendbox[1, 0]:extendbox[1, 1],
+                   extendbox[2, 0]:extendbox[2, 1]]
+        print(sliceim2.shape)
+        exampled_preprocessing.append(sliceim2[int(sample_factor*self.slices.shape[0])])
 
         # -------------------------------------------FINAL DOWNSAMPLE ---------------------------------------------#
-        #self.slices = sliceim2[np.newaxis,...]
-        #print(f"SLICEIMSHAPE: {self.slices.shape}")
-        #print("Finished... Outputting Results")
+        self.slices = sliceim2[np.newaxis,...]
+        print(f"SLICEIMSHAPE: {self.slices.shape}")
+        print("Finished... Outputting Results")
         #show_slices(self.slices[0,128:,:,:], total_cols=8)
         #for i in range(self.slices.shape[0]-1):
         #    im = Image.fromarray((self.slices[i]))
@@ -411,17 +410,59 @@ def load_numpy():
     print(slices.shape)
     show_slices([slices[0,40, : , :]], total_cols=1)
 
+
+
+class MRIdataset(object):
+    def __init__(self):
+        pass
+
+    def __call__(self, scan, save ='', image_size=(256,256,256)):
+        self.scan = scan.get_fdata()
+
+        if any(np.asarray(self.scan.shape) <= image_size):
+            dif = image_size - self.scan.shape
+            mod = dif % 2
+            dif = dif // 2
+            pad = np.maximum(dif, [0, 0, 0])
+            pad = tuple(zip(pad, pad + mod))
+            self.scan = np.pad(self.scan, pad, 'reflect')
+
+        sz = image_size[0]
+        if any(np.asarray(self.scan.shape) >= image_size):
+            x, y, z = self.scan.shape
+            x = x // 2 - (sz // 2)
+            y = y // 2 - (sz // 2)
+            z = z // 2 - (sz // 2)
+            self.scan = self.scan[x:x + sz, y:y + sz, z:z + sz]
+        # Stats obtained from the MSD dataset
+        self.scan = np.clip(self.scan, a_min=-1024, a_max=326)
+        self.scan = (self.scan - 159.14433291523548) / 323.0573880113456
+        self.scan = np.expand_dims(self.scan, 0)
+
+        if save:
+            self.save_as_numpy(save)
+        return self.scan
+
+    def save_as_numpy(self, path):
+        name = path.split('\\')[-1]
+        name = name.split('.')[0]
+        prep_folder = os.path.join(config.DATA_DIR, "Preprocessed-LUCAS")
+        print(f"Saved as {name} in {prep_folder}")
+        np.save(os.path.join(prep_folder, name), self.scan)
+
+
 if __name__ == "__main__":
     scans_dir = str(os.path.join(config.DATA_DIR, "SCANS"))
-    saved_dir = str(os.path.join(config.DATA_DIR, "Preprocessed"))
-    preprocessor = LiaoTransform()
+    saved_dir = str(os.path.join(config.DATA_DIR, "Preprocessed-MRI"))
+    preprocessor = MRIdataset()
     files = Plib(scans_dir).glob('*')
     for f in files:
         name = str(f).split("\\")[-1].split('.')[0] + ".npy"
         saved_path = str(os.path.join(saved_dir, name))
-        #if not os.path.exists(saved_path):
-        print(f"Processing {f}")
-        preprocessor(nib.load(f))
-        #else:
-        #    print(f"{f} already processed")
+        print(saved_path)
+        if not os.path.exists(saved_path):
+            print(f"Processing {f}")
+            preprocessor(nib.load(f), save=saved_path)
+        else:
+            print(f"{f} already processed")
     # Add steps to preprocess entire dataset

@@ -10,7 +10,7 @@ import nibabel as nib
 import numpy as np
 import torch
 
-path.append('utils/')
+path.append('util/')
 
 
 class LUCASDataset(Dataset):
@@ -41,7 +41,7 @@ class LUCASDataset(Dataset):
         label = self.labels[patient][self.task]
 
         if self.preprocessed == True:
-            image_dir = os.path.join(self.root, "Preprocessed", str(patient) + ".npy")
+            image_dir = os.path.join(self.root, "Preprocessed-LUCAS", str(patient) + ".npy")
             scan = np.load(image_dir)
         else:
             image_dir = os.path.join(self.root, "SCANS", str(patient) + ".nii.gz")
