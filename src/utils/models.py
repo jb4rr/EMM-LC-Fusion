@@ -61,10 +61,10 @@ class VGG16(nn.Module):
         x = self.maxpool(x)
         x = x.reshape(x.shape[0], -1)
         x = F.relu(self.fc1(x))
-        x = F.dropout(x, 0.5)  # dropout was included to combat overfitting
+      #  x = F.dropout(x, 0.5)  # dropout was included to combat overfitting
         x = F.relu(self.fc2(x))
         x = F.dropout(x, 0.5)
-        x = self.fc3(x)
+        x = torch.sigmoid(self.fc3(x)) #
         return x
 
 

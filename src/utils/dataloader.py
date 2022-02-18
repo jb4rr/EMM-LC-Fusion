@@ -49,7 +49,7 @@ class LUCASDataset(Dataset):
 
         if self.transform:
             scan = self.transform(scan)
-        show_slices(scan[0,20:56,:,:], total_cols=6)
+        # show_slices(scan[0,20:56,:,:], total_cols=6)
 
         return scan, float(label)
 

@@ -323,7 +323,8 @@ class LiaoTransform(object):
         self.slices = self.scan.get_fdata()
         self.slices = np.stack([(self.slices[:, :, s]) for s in range(self.slices.shape[-1])])
         self.slices = self.slices.astype(np.int16)
-        exampled_preprocessing.append(self.scan.get_fdata()[:, :, int(sample_factor * self.slices.shape[0])])
+        #show_slices(self.slices[128:, :, :], total_cols=10)
+        #exampled_preprocessing.append(self.scan.get_fdata()[:, :, int(sample_factor * self.slices.shape[0])])
         # -------------------------------------------------------------------------------------------------------#
         #                                           CREATE MASK
         m1, m2, spacing = mask_extraction(self.scan, self.slices)
@@ -341,20 +342,20 @@ class LiaoTransform(object):
             [np.max([[0, 0, 0], box[:, 0] - margin], 0), np.min([newshape, box[:, 1] + 2 * margin], axis=0).T]).T
         extendbox = extendbox.astype('int')
 
-        dm1 = process_mask(m1)
-        dm2 = process_mask(m2)
-        dilatedMask = dm1 + dm2
-        Mask = m1 + m2
-        extramask = dilatedMask ^ Mask
-        bone_thresh = 210
-        pad_value = 170
+        #dm1 = process_mask(m1)
+        #dm2 = process_mask(m2)
+        #dilatedMask = dm1 + dm2
+        #Mask = m1 + m2
+        #extramask = dilatedMask ^ Mask
+        #bone_thresh = 210
+        #pad_value = 170
 
-        self.slices[np.isnan(self.slices)] = -2000
-        sliceim = lumTrans(self.slices)
-        sliceim = sliceim * dilatedMask + pad_value * (1 - dilatedMask).astype('uint8')
-        bones = sliceim * extramask > bone_thresh
-        sliceim[bones] = pad_value
-        exampled_preprocessing.append(sliceim[int(sample_factor*self.slices.shape[0])])
+        #self.slices[np.isnan(self.slices)] = -2000
+        #sliceim = lumTrans(self.slices)
+        #sliceim = sliceim * dilatedMask + pad_value * (1 - dilatedMask).astype('uint8')
+        #bones = sliceim * extramask > bone_thresh
+        #sliceim[bones] = pad_value
+        #exampled_preprocessing.append(sliceim[int(sample_factor*self.slices.shape[0])])
         # -----------------------------------------------Crop-----------------------------------------------------#
         #sliceim1, _ = resample(sliceim, spacing, resolution, order=1)
 
@@ -365,16 +366,16 @@ class LiaoTransform(object):
         #exampled_preprocessing.append(sliceim2[int(sample_factor*self.slices.shape[0])])
 
         # -------------------------------------------FINAL DOWNSAMPLE ---------------------------------------------#
-        self.slices = sliceim[np.newaxis,...]
-        print(f"SLICEIMSHAPE: {self.slices.shape}")
+        #self.slices = sliceim2[np.newaxis,...]
+        #print(f"SLICEIMSHAPE: {self.slices.shape}")
         #print("Finished... Outputting Results")
-        #show_slices(exampled_preprocessing, total_cols=len(exampled_preprocessing))
+        #show_slices(self.slices[0,128:,:,:], total_cols=8)
         #for i in range(self.slices.shape[0]-1):
         #    im = Image.fromarray((self.slices[i]))
         #    im.save(f'./test/image-{i}.png')
         # --------------------------------------------If SAVE = True -----------------------------------------------#
         if save:
-            self.save_as_numpy((save))
+            self.save_as_numpy(save)
         return self.slices
 
     def save_as_numpy(self, path):
@@ -390,15 +391,17 @@ def show_slices(slices, total_cols=6):
         ref: https://towardsdatascience.com/dynamic-subplot-layout-in-seaborn-e777500c7386
         author: Daniel Deutsch
     """
+    print(len(slices))
     num_plots = len(slices)
     total_rows = num_plots // total_cols + 1
     _, axs = plt.subplots(total_rows, total_cols)
     axs = axs.flatten()
-    titles=["Original"]#, "Mask", "Output"]
-    for img, ax, title in zip(slices, axs, titles):
-        ax.axis("off")
-        ax.title.set_text(title)
-        ax.set_axis_off()
+    axs = axs.flatten()
+    i=0
+    for img, ax in zip(slices, axs):
+        i +=1
+        im = Image.fromarray(img)
+        im.save(f'./test/img{i}.png')
         ax.imshow(img, cmap="gray")
     plt.show()
 
@@ -416,8 +419,9 @@ if __name__ == "__main__":
     for f in files:
         name = str(f).split("\\")[-1].split('.')[0] + ".npy"
         saved_path = str(os.path.join(saved_dir, name))
-        if not os.path.exists(saved_path):
-            preprocessor(nib.load(f), save=str(f))
-        else:
-            print(f"{f} already processed")
+        #if not os.path.exists(saved_path):
+        print(f"Processing {f}")
+        preprocessor(nib.load(f))
+        #else:
+        #    print(f"{f} already processed")
     # Add steps to preprocess entire dataset
