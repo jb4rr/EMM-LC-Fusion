@@ -12,7 +12,6 @@ import scipy.ndimage
 import warnings
 from PIL import Image
 from nilearn.image import resample_img
-from numba import jit, cuda
 from tqdm import tqdm
 from pathlib import Path as Plib
 from src import config

@@ -18,6 +18,7 @@ class VGG16(nn.Module):
 
         self.conv1_1 = nn.Conv3d(in_channels=1, out_channels=64, kernel_size=(3, 3, 3), padding=(1, 1, 1))
         self.conv1_2 = nn.Conv3d(in_channels=64, out_channels=64, kernel_size=(3, 3, 3), padding=(1, 1, 1))
+
         self.conv2_1 = nn.Conv3d(in_channels=64, out_channels=128, kernel_size=(3, 3, 3), padding=(1, 1, 1))
         self.conv2_2 = nn.Conv3d(in_channels=128, out_channels=128, kernel_size=(3, 3, 3), padding=(1, 1, 1))
         self.conv3_1 = nn.Conv3d(in_channels=128, out_channels=256, kernel_size=(3, 3, 3), padding=(1, 1, 1))
@@ -56,8 +57,10 @@ class VGG16(nn.Module):
         x = self.maxpool(x)
         x = x.reshape(x.shape[0], -1)
         x = F.relu(self.fc1(x))
+        x = F.dropout3d(x, 0.5)
         x = F.relu(self.fc2(x))
-        x = torch.sigmoid(self.fc3(x))
+        #x = F.dropout3d(x, 0.5)
+        x = self.fc3(x)
         return x
 
 

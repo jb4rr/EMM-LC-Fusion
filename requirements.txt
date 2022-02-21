@@ -3,12 +3,9 @@ scikit-image~=0.19.1
 matplotlib~=3.5.1
 nibabel~=3.2.1
 pandas~=1.4.0
-numpy~=1.21.5
-torch~=1.10.2
-torchvision~=0.11.3
-scipy~=1.7.3
+scipy~=1.7.
 Pillow~=9.0.0
 nilearn~=0.9.0
-numba~=0.55.1
-torchio~=0.18.73
 tqdm
+tensorboard
+

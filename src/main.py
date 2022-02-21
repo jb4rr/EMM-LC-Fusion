@@ -30,50 +30,56 @@ def save_model(model, epoch, loss, optim):
     print(f"Saved Epoch as models/model-{epoch}.pt")
 
 
-def train_model(epoch, model, optim, criterion, train_loader):
+def train_model(epoch, model, optim, criterion, train_loader, data, targets, writer):
     model.train()
     epoch_loss = AverageMeter()
     batch_loss = AverageMeter()
-    print_stats = len(train_loader) // 5
-    writer = SummaryWriter('./models/logs/runs')
-    running_loss = 0.0
-    for batch_idx, (data, targets) in enumerate(train_loader):
-        data = data.to(device=config.DEVICE).float()
-        targets = targets.to(device=config.DEVICE).float()
+    print_stats = 1 #len(train_loader) // (len(train_loader)*0.5)
 
-        # Forward Pass
-        scores = model(data)
-        loss = criterion(scores, targets.unsqueeze(1))
+    running_loss = 0
+    batch_idx = 0
+    # Test for Overfitting
 
-        # Backward Pass
-        optim.zero_grad()
-        loss.backward()
+    #for batch_idx, (data, targets) in enumerate(train_loader):
+    data = data.to(device=config.DEVICE).float()
+    targets = targets.to(device=config.DEVICE).float()
 
-        # Adam Step
-        optim.step()
+    # Forward Pass
+    scores = model(data)
+    loss = criterion(scores, targets.unsqueeze(1))
 
-        batch_loss.update(loss.item())
-        epoch_loss.update(loss.item())
+    # Backward Pass
+    optim.zero_grad()
+    loss.backward()
 
-        if batch_loss.count % print_stats == 0:
-            writer.add_scalar('training loss',
-                              batch_loss.avg,
-                              epoch * len(train_loader) + batch_idx)
-            text = '{} -- [{}/{} ({:.0f}%)]\tLoss: {:.6f}'
-            print(text.format(
-                time.strftime("%H:%M:%S"), (batch_idx + 1),
-                (len(train_loader)), 100. * (batch_idx + 1) / (len(train_loader)),
-                batch_loss.avg))
-            batch_loss.reset()
+    # Adam Step
+    optim.step()
+
+    batch_loss.update(loss.item())
+    epoch_loss.update(loss.item())
+
+    #if batch_loss.count % print_stats == 0:
+    writer.add_scalar('training loss',
+                         batch_loss.avg,
+                        epoch * len(train_loader) + batch_idx)
+    text = '{} -- [{}/{} ({:.0f}%)]\tLoss: {:.6f}'
+    print(text.format(
+            time.strftime("%H:%M:%S"), (batch_idx + 1),
+            (len(train_loader)), 100. * (batch_idx + 1) / (len(train_loader)),
+            batch_loss.avg))
+    print(targets)
+    print(scores)
+    #print(torch.argmax(torch.softmax(scores, dim=1), dim=1))
+    batch_loss.reset()
     print('--- Train: \tLoss: {:.6f} ---'.format(epoch_loss.avg))
     return epoch_loss.avg
 
 
 def main(load_path=None, train=True):
-
+    print("Running...")
     train_data = LUCASDataset('train_file.csv', preprocessed=True, transform=transforms.Compose([Resize((64, 64, 64))]))
     test_data = LUCASDataset('test_file.csv', preprocessed=True, transform=transforms.Compose([Resize((64, 64, 64))]))
-
+    print("Loaded Dataset")
     #train_data = MRIdataset('train_file.csv', 'train_descriptor.csv', config.DATA_DIR, config.IMAGE_SIZE, transforms=transforms.Compose([Resize((64, 64, 64))]))
     #test_data = MRIdataset('test_file.csv', 'test_descriptor.csv', config.DATA_DIR, config.IMAGE_SIZE, transforms=transforms.Compose([Resize((64, 64, 64))]))
 
@@ -84,17 +90,17 @@ def main(load_path=None, train=True):
                               num_workers=config.NUM_WORKERS)
     test_loader = DataLoader(test_data, batch_size=config.BATCH_SIZE,
                              num_workers=config.NUM_WORKERS)
-
+    print("Loader Initialised")
     model = VGG16()  # to compile the model
     model = model.to(device=config.DEVICE)  # to send the model for training on either cuda or cpu
     model = model.float()
+    print("Model Initialised")
 
-
-    criterion = nn.BCELoss()
+    criterion = nn.BCEWithLogitsLoss()
     optimizer = Adam(model.parameters(), lr=config.LR)  # Adam seems to be the most popular for deep learning
     epoch = 0
     best_f1 = 0
-
+    print("Training")
     if train:
         torch.cuda.empty_cache()
         if load_path:
@@ -102,29 +108,34 @@ def main(load_path=None, train=True):
             model.load_state_dict(checkpoint['model_state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             epoch = checkpoint['epoch']
+        data, targets = next(iter(train_loader))
+        print(targets)
+        writer = SummaryWriter('./models/logs/runs')
         for epoch in range(epoch, config.NUM_EPOCHS):
-            train_loss = train_model(epoch, model, optimizer, criterion, train_loader)
+            print(f"Epoch {epoch}")
+
+            train_loss = train_model(epoch, model, optimizer, criterion, train_loader, data, targets, writer)
             print(f"Loss in epoch {epoch} :::: {train_loss / len(train_loader)}")
             # Save Model
-            test_loss, f1, flag = test(model, test_loader, '../models/logs/', criterion, training=True)
+            #test_loss, f1, flag = test(model, test_loader, '../models/logs/', criterion, training=True)
 
-            is_best = False
-            if flag:
-                is_best = best_f1 < f1
-                best_f1 = max(best_f1, f1)
+            #is_best = False
+            #if flag:
+            #    is_best = best_f1 < f1
+            #    best_f1 = max(best_f1, f1)
 
-            state = {
-                'epoch': epoch,
-                'state_dict': model.state_dict(),
-                'optimizer': optimizer.state_dict(),
-                'loss': [train_loss, test_loss],
-                'lr': config.LR,
-                'f1': f1,
-                'best_f1': best_f1}
+            #state = {
+            #    'epoch': epoch,
+            #    'state_dict': model.state_dict(),
+            #    'optimizer': optimizer.state_dict(),
+            #    'loss': [train_loss, test_loss],
+            #    'lr': config.LR,
+            #    'f1': f1,
+            #    'best_f1': best_f1}
 
             # Implemenent is best
-            if is_best:
-                save_model(model, epoch, test_loss, optimizer, path="src/models/Best.pth")
+            #if is_best:
+            #    save_model(model, epoch, test_loss, optimizer, path="src/models/Best.pth")
     else:
         pass
         # Implement Model Predict
