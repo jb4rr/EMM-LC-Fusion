@@ -71,21 +71,22 @@ class DenoisingAutoEncoder(nn.Module):
     def __init__(self):
         super(DenoisingAutoEncoder, self).__init__()
         self.encoder = nn.Sequential(
-            nn.Linear(28 * 28, 256),
+            nn.Linear(76, 76),
             nn.ReLU(True),
-            nn.Linear(256, 128),
+            nn.Linear(76, 76),
+            # Randomly Dropout 1 Neuron to add 'noise'
+            nn.Dropout(1 / 76),
             nn.ReLU(True),
-            nn.Linear(128, 64),
+            nn.Linear(76, 76*20),
             nn.ReLU(True)
-
         )
 
         self.decoder = nn.Sequential(
-            nn.Linear(64, 128),
+            nn.Linear(76*20, 76),
             nn.ReLU(True),
-            nn.Linear(128, 256),
+            nn.Linear(76, 76),
             nn.ReLU(True),
-            nn.Linear(256, 28 * 28),
+            nn.Linear(76, 76),
             nn.Sigmoid(),
         )
 
@@ -94,16 +95,13 @@ class DenoisingAutoEncoder(nn.Module):
         out = self.decoder(x)
         return out
 
-if __name__ == '__main__':
-    # Get Sample data
-    image = torch.rand((1, 1, 64, 64, 64), device=config.DEVICE)
-    # imin = image.view(64 * 64 * 64, -1)
-    # print(imin.shape)
-    # 5D: [batch_size, channels, depth, height, width]
-    # print(f'INPUT SHAPE: {image.shape} \nINPUT TYPE: {type(image)}')
-    vgg_model = VGG16().to(config.DEVICE)
-    image = image
 
+if __name__ == '__main__':
+    # Test Model
+    ct_scan = torch.rand((1, 1, 64, 64, 64), device=config.DEVICE)
+    clinical_data = torch.rand((1,1,76), device=config.DEVICE)
+    vgg_model = VGG16().to(config.DEVICE)
+    AutoEncoder = DenoisingAutoEncoder().to(config.DEVICE)
     # Test Model with sample data
-    output = vgg_model(image)
-    print(output)
+    output_1 = vgg_model(ct_scan)
+    output_2 = AutoEncoder(clinical_data)

@@ -320,6 +320,7 @@ class LiaoTransform(object):
         Mask = m1 + m2
         logging.debug("Mask Extracted")
         exampled_preprocessing.append(Mask[int(sample_factor * self.slices.shape[0]), :, :])
+        # show_slices(exampled_preprocessing, total_cols=2, titles=['Original', 'Mask'])
         # -------------------------------------------------------------------------------------------------------#
         xx, yy, zz = np.where(Mask)
         # Error if mask is none.
@@ -341,7 +342,7 @@ class LiaoTransform(object):
         bones = sliceim * extramask > bone_thresh
         logging.debug("Dilating Mask")
         sliceim[bones] = pad_value
-
+        self.slices = sliceim
         logging.debug("Completed Preprocessing")
         # show_slices(exampled_preprocessing, total_cols=3)
 
@@ -355,7 +356,7 @@ class LiaoTransform(object):
         np.save(path, self.slices)
 
 
-def show_slices(slices, total_cols=6, titles=['Original', 'Mask', 'Output']):
+def show_slices(slices, total_cols=6, titles=['Original', 'Mask', 'Output'], save_fig=False):
     """
         Function to display row of image slices
         ref: https://towardsdatascience.com/dynamic-subplot-layout-in-seaborn-e777500c7386
@@ -371,13 +372,15 @@ def show_slices(slices, total_cols=6, titles=['Original', 'Mask', 'Output']):
             ax.title.set_text(title)
             ax.axis("off")
             ax.imshow(img, cmap="gray")
-        plt.savefig(f'../../images/1_lung.png')
+        if save_fig:
+            plt.savefig(f'../../images/1_lung.png')
         plt.show()
     else:
         for img, ax in zip(slices, axs):
             ax.axis("off")
             ax.imshow(img, cmap="gray")
-        plt.savefig(f'../../images/no_lung.png')
+        if save_fig:
+            plt.savefig(f'../../images/1_lung.png')
         plt.show()
 
 
@@ -432,7 +435,7 @@ def get_sample(saved_dir, num_samples=16, sample_point=0.5):
     for i in files_index:
         # Load Numpy Data
         scan = np.load(str(flst[i]))
-        img_list.append(scan[0, int(scan.shape[1] * sample_point), :, :])
+        img_list.append(scan[int(scan.shape[1] * sample_point), :, :])
         # Get name for each Numpy Image
         name_list.append(str(flst[i]).split('\\')[-1].split('.')[0])
     # Show Slices
@@ -459,10 +462,9 @@ if __name__ == "__main__":
 
         # Get File Name
         name = str(file).split("\\")[-1].split('.')[0] + ".npy"
-
         # Create Save Directory
         saved_path = str(os.path.join(saved_dir, name))
-        if not os.path.exists(saved_path):
+        if not os.path.exists(saved_path) and name not in open("./failed.txt").read():
             logging.debug(f"Processing {file}")
             try:
                 # Process File
