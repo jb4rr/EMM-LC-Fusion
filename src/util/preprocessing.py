@@ -20,11 +20,14 @@ from skimage import measure
 from scipy.ndimage.morphology import binary_dilation,generate_binary_structure
 from skimage.morphology import convex_hull_image
 from scipy.ndimage.interpolation import zoom
-sample_factor = 0.5
+import random
+import math
+import logging
+sample_factor = 0.6
 path.append('util/')
 
 
-def binarize_per_slice(image, spacing, intensity_th=-600, sigma=1, area_th=30, eccen_th=0.99, bg_patch_size=10):
+def binarize_per_slice(image, spacing, intensity_th=-600, sigma=1, area_th=10, eccen_th=0.99, bg_patch_size=10):
     bw = np.zeros(image.shape, dtype=bool)
     # prepare a mask, with all corner values set to nan
     image_size = image.shape[1]
@@ -55,8 +58,11 @@ def binarize_per_slice(image, spacing, intensity_th=-600, sigma=1, area_th=30, e
     return bw
 
 
-def all_slice_analysis(bw, spacing, cut_num=0, vol_limit=[0.68, 8.2], area_th=6e3, dist_th=62):
+def all_slice_analysis(bw, spacing, cut_num=0, vol_limit=None, area_th=6e3, dist_th=30):
     # in some cases, several top layers need to be removed first
+    if vol_limit is None:
+        vol_limit = [0.68, 8.2]
+
     if cut_num > 0:
         bw0 = np.copy(bw)
         bw[-cut_num:] = False
@@ -215,6 +221,7 @@ def mask_extraction(scan, slices):
     # Union remaining components for the final mask
     spacing = scan.header.get_zooms()
     spacing = np.array(spacing, dtype=np.float32)
+    #spacing = np.roll(spacing, 1)
     bw = binarize_per_slice(slices, spacing)
     flag = 0
     cut_num = 0
@@ -222,26 +229,12 @@ def mask_extraction(scan, slices):
     bw0 = np.copy(bw)
     while flag == 0 and cut_num < bw.shape[0]:
         bw = np.copy(bw0)
-        bw, flag = all_slice_analysis(bw, spacing, cut_num=cut_num, vol_limit=[0.68, 7.5])
+        bw, flag = all_slice_analysis(bw, spacing, cut_num=cut_num, vol_limit=[0.6, 8.2])
         cut_num = cut_num + cut_step
 
     bw = fill_hole(bw)
     bw1, bw2, bw = two_lung_only(bw, spacing)
-    # show_slices([bw1[50], bw2[50], bw[50]], total_cols=3)
     return bw1, bw2, spacing
-
-
-def extend_box(mask, spacing, resolution):
-    newshape = np.round(np.array(mask.shape) * spacing / resolution)
-    xx, yy, zz = np.where(mask)
-    box = np.array([[np.min(xx), np.max(xx)], [np.min(yy), np.max(yy)], [np.min(zz), np.max(zz)]])
-    box = box * np.expand_dims(spacing, 1) / np.expand_dims(resolution, 1)
-    box = np.floor(box).astype('int')
-    margin = 5
-    extendbox = np.vstack(
-        [np.max([[0, 0, 0], box[:, 0] - margin], 0), np.min([newshape, box[:, 1] + 2 * margin], axis=0).T]).T
-    extendbox = extendbox.astype('int')
-    return extendbox
 
 
 def process_mask(mask):
@@ -270,10 +263,8 @@ def lumTrans(img):
 
 
 def resample(imgs, spacing, new_spacing,order = 2):
-    print(f"||RESAMPLE||\nIMAGE SHAPE: {imgs.shape}")
     if len(imgs.shape)==3:
         new_shape = np.round(imgs.shape * spacing / new_spacing)
-        print(f"NEW SHAPE: {new_shape}")
         true_spacing = spacing * imgs.shape / new_shape
         resize_factor = new_shape / imgs.shape
         with warnings.catch_warnings():
@@ -314,32 +305,25 @@ class LiaoTransform(object):
         self.scan = scan
         # -------------------------------------------------------------------------------------------------------#
         #                                         RESIZE OF SCAN Factor=0.25
-        print(f"Scan Size: {self.scan.get_fdata().shape} \nHeader: {self.scan.header.get_zooms()}")
+        logging.debug(f"Scan Size: {self.scan.get_fdata().shape}") # \n   Header: {self.scan.header.get_zooms()}")
         self.scan = resample_img(self.scan, target_affine=self.scan.affine/0.5, interpolation='nearest')
-        print(f"Resized to {self.scan.get_fdata().shape} \nHeader: {self.scan.header.get_zooms()}")
+        logging.debug(f"Resized to {self.scan.get_fdata().shape}") # \n   Header: {self.scan.header.get_zooms()}")
         # -------------------------------------------------------------------------------------------------------#
         #                                           GET SLICES
         self.slices = self.scan.get_fdata()
-        self.slices = np.stack([(self.slices[:, :, s]) for s in range(self.slices.shape[-1])])
-        self.slices = self.slices.astype(np.int16)
-        #show_slices(self.slices[128:, :, :], total_cols=10)
-        #exampled_preprocessing.append(self.scan.get_fdata()[:, :, int(sample_factor * self.slices.shape[0])])
+        self.slices = np.stack([(self.slices[:, :, s]) for s in range(self.slices.shape[-1])]).astype(np.int16)
+        exampled_preprocessing.append(self.scan.get_fdata()[:, :, int(sample_factor * self.slices.shape[0])])
         # -------------------------------------------------------------------------------------------------------#
         #                                           CREATE MASK
+        logging.debug("Extracting Mask")
         m1, m2, spacing = mask_extraction(self.scan, self.slices)
         Mask = m1 + m2
-        print(f"Mask: {Mask.shape}")
+        logging.debug("Mask Extracted")
         exampled_preprocessing.append(Mask[int(sample_factor * self.slices.shape[0]), :, :])
         # -------------------------------------------------------------------------------------------------------#
-        newshape = np.round(np.array(Mask.shape) * spacing / resolution)
         xx, yy, zz = np.where(Mask)
+        # Error if mask is none.
         box = np.array([[np.min(xx), np.max(xx)], [np.min(yy), np.max(yy)], [np.min(zz), np.max(zz)]])
-        box = box * np.expand_dims(spacing, 1) / np.expand_dims(resolution, 1)
-        box = np.floor(box).astype('int')
-        margin = 5
-        extendbox = np.vstack(
-            [np.max([[0, 0, 0], box[:, 0] - margin], 0), np.min([newshape, box[:, 1] + 2 * margin], axis=0).T]).T
-        extendbox = extendbox.astype('int')
 
         dm1 = process_mask(m1)
         dm2 = process_mask(m2)
@@ -348,67 +332,53 @@ class LiaoTransform(object):
         extramask = dilatedMask ^ Mask
         bone_thresh = 210
         pad_value = 170
+
         self.slices[np.isnan(self.slices)] = -2000
         sliceim = lumTrans(self.slices)
+        logging.debug("Applying Mask")
         sliceim = sliceim * dilatedMask + pad_value * (1 - dilatedMask).astype('uint8')
+        exampled_preprocessing.append(sliceim[int(sample_factor * self.slices.shape[0]), :, :])
         bones = sliceim * extramask > bone_thresh
+        logging.debug("Dilating Mask")
         sliceim[bones] = pad_value
-        exampled_preprocessing.append(sliceim[int(sample_factor*self.slices.shape[0])])
-        # -----------------------------------------------Crop-----------------------------------------------------#
-        sliceim1, _ = resample(sliceim, spacing, resolution, order=1)
 
-        sliceim2 = sliceim1[extendbox[0, 0]:extendbox[0, 1],
-                   extendbox[1, 0]:extendbox[1, 1],
-                   extendbox[2, 0]:extendbox[2, 1]]
-        print(sliceim2.shape)
-        exampled_preprocessing.append(sliceim2[int(sample_factor*self.slices.shape[0])])
+        logging.debug("Completed Preprocessing")
+        # show_slices(exampled_preprocessing, total_cols=3)
 
-        # -------------------------------------------FINAL DOWNSAMPLE ---------------------------------------------#
-        self.slices = sliceim2[np.newaxis,...]
-        print(f"SLICEIMSHAPE: {self.slices.shape}")
-        print("Finished... Outputting Results")
-        #show_slices(self.slices[0,128:,:,:], total_cols=8)
-        #for i in range(self.slices.shape[0]-1):
-        #    im = Image.fromarray((self.slices[i]))
-        #    im.save(f'./test/image-{i}.png')
         # --------------------------------------------If SAVE = True -----------------------------------------------#
         if save:
+            logging.debug(f"Saving Image in {path}")
             self.save_as_numpy(save)
         return self.slices
 
     def save_as_numpy(self, path):
-        name = path.split('\\')[-1]
-        name = name.split('.')[0]
-        prep_folder = os.path.join(config.DATA_DIR, "Preprocessed")
-        print(f"Saved as {name} in {prep_folder}")
-        np.save(os.path.join(prep_folder, name), self.slices)
+        np.save(path, self.slices)
 
-def show_slices(slices, total_cols=6):
+
+def show_slices(slices, total_cols=6, titles=['Original', 'Mask', 'Output']):
     """
         Function to display row of image slices
         ref: https://towardsdatascience.com/dynamic-subplot-layout-in-seaborn-e777500c7386
         author: Daniel Deutsch
     """
-    print(len(slices))
     num_plots = len(slices)
     total_rows = num_plots // total_cols + 1
     _, axs = plt.subplots(total_rows, total_cols)
     axs = axs.flatten()
     axs = axs.flatten()
-    i=0
-    for img, ax in zip(slices, axs):
-        i +=1
-        im = Image.fromarray(img)
-        im.save(f'./test/img{i}.png')
-        ax.imshow(img, cmap="gray")
-    plt.show()
-
-
-def load_numpy():
-    slices = np.load(r'D:\University of Gloucestershire\Year 4\Dissertation\Preprocessed\4016910.npy')
-    print(slices.shape)
-    show_slices([slices[0,40, : , :]], total_cols=1)
-
+    if len(titles) == len(slices):
+        for img, ax, title in zip(slices, axs, titles):
+            ax.title.set_text(title)
+            ax.axis("off")
+            ax.imshow(img, cmap="gray")
+        plt.savefig(f'../../images/1_lung.png')
+        plt.show()
+    else:
+        for img, ax in zip(slices, axs):
+            ax.axis("off")
+            ax.imshow(img, cmap="gray")
+        plt.savefig(f'../../images/no_lung.png')
+        plt.show()
 
 
 class MRIdataset(object):
@@ -442,26 +412,71 @@ class MRIdataset(object):
             self.save_as_numpy(save)
         return self.scan
 
-    def save_as_numpy(self, path):
-        name = path.split('\\')[-1]
-        name = name.split('.')[0]
-        prep_folder = os.path.join(config.DATA_DIR, "Preprocessed-LUCAS")
-        print(f"Saved as {name} in {prep_folder}")
-        np.save(os.path.join(prep_folder, name), self.scan)
+    def save_as_numpy(self, save_path):
+        print(f"Saved as {name} in {save_path}")
+        np.save(save_path, self.scan)
 
+
+def get_sample(saved_dir, num_samples=16, sample_point=0.5):
+    # Get Random Sample of process data
+    flst = []
+    # Get List of Files
+    files = Plib(saved_dir).glob('*')
+    for f in files:
+        flst.append(f)
+    # get random index's
+    files_index = random.sample(range(0, len(flst)), num_samples)
+
+    img_list = []
+    name_list = []
+    for i in files_index:
+        # Load Numpy Data
+        scan = np.load(str(flst[i]))
+        img_list.append(scan[0, int(scan.shape[1] * sample_point), :, :])
+        # Get name for each Numpy Image
+        name_list.append(str(flst[i]).split('\\')[-1].split('.')[0])
+    # Show Slices
+    show_slices(img_list, total_cols=int(math.sqrt(num_samples)), titles=name_list)
 
 if __name__ == "__main__":
+    # Set Logging Level:
+    logging.basicConfig(format='%(asctime)s: %(message)s', level=logging.DEBUG, datefmt='%m/%d/%Y %I:%M:%S %p')
+
+    # Set RAW data file
     scans_dir = str(os.path.join(config.DATA_DIR, "SCANS"))
-    saved_dir = str(os.path.join(config.DATA_DIR, "Preprocessed-MRI"))
-    preprocessor = MRIdataset()
+
+    # Set directory to save to
+    saved_dir = str(os.path.join(config.DATA_DIR, "Preprocessed-LIAO"))
+
+    # Initialise Class Method
+    preprocessor = LiaoTransform()
+
+    # Get File List
     files = Plib(scans_dir).glob('*')
-    for f in files:
-        name = str(f).split("\\")[-1].split('.')[0] + ".npy"
+
+    # Iterate through files
+    for file in files:
+
+        # Get File Name
+        name = str(file).split("\\")[-1].split('.')[0] + ".npy"
+
+        # Create Save Directory
         saved_path = str(os.path.join(saved_dir, name))
-        print(saved_path)
         if not os.path.exists(saved_path):
-            print(f"Processing {f}")
-            preprocessor(nib.load(f), save=saved_path)
+            logging.debug(f"Processing {file}")
+            try:
+                # Process File
+                preprocessor(nib.load(file), save=saved_path)
+
+            except:
+                # If Error, skip pre-processing and append file name to failed.txt
+                logging.warning(f"FAILED: Skipping {file}")
+                f = open("./failed.txt", "a")
+                f.write('\n')
+                f.write(name)
+                f.close()
         else:
-            print(f"{f} already processed")
-    # Add steps to preprocess entire dataset
+            # Supports pausing and restarting of pre-processing
+            logging.debug(f"{file} already processed")
+
+    get_sample(saved_dir, num_samples=25)
