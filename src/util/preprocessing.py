@@ -450,7 +450,7 @@ if __name__ == "__main__":
 
     # Set directory to save to
     saved_dir = str(os.path.join(config.DATA_DIR, "Preprocessed-LIAO"))
-
+    get_sample(saved_dir, num_samples=25)
     # Initialise Class Method
     preprocessor = LiaoTransform()
 

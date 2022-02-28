@@ -71,22 +71,22 @@ class DenoisingAutoEncoder(nn.Module):
     def __init__(self):
         super(DenoisingAutoEncoder, self).__init__()
         self.encoder = nn.Sequential(
-            nn.Linear(76, 76),
-            nn.ReLU(True),
-            nn.Linear(76, 76),
             # Randomly Dropout 1 Neuron to add 'noise'
-            nn.Dropout(1 / 76),
+            nn.Dropout(0.2),
+            nn.Linear(76, 76*10),
             nn.ReLU(True),
-            nn.Linear(76, 76*20),
-            nn.ReLU(True)
+            nn.Linear(76*10, 76*15),
+            nn.ReLU(True),
+            nn.Linear(76*15, 76*20),
+            nn.ReLU(True),
         )
 
         self.decoder = nn.Sequential(
-            nn.Linear(76*20, 76),
+            nn.Linear(76*20, 76*15),
             nn.ReLU(True),
-            nn.Linear(76, 76),
+            nn.Linear(76*15, 76*10),
             nn.ReLU(True),
-            nn.Linear(76, 76),
+            nn.Linear(76*10, 76),
             nn.Sigmoid(),
         )
 
