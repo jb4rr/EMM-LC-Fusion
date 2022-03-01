@@ -12,8 +12,28 @@ import torch
 
 path.append('util/')
 
+class DAE(Dataset):
+    def __init__(self, csv_file, transform=None):
+        self.root = config.DATA_DIR
+        self.labels = pd.read_csv(os.path.join(self.root, csv_file))
+        self.labels = self.labels.set_index('patient_id').T.to_dict('list')
+        self.idx = self.idx = list(self.labels.keys())
+        self.factors = [2,3,4,5,6,7,8,9,11,13,14,15,16]
 
-class LUCASDataset(Dataset):
+    def __len__(self):
+        return len(self.labels)
+
+    def __getitem__(self, idx):
+        # Get Patient
+        patient = self.idx[idx]
+
+        # Exclude Cancer Diagnosis From Training
+        label = [list(self.labels[patient])[i] for i in self.factors]
+        label = torch.unsqueeze(torch.tensor(label), 0)
+        return label
+
+
+class VGG16_Loader(Dataset):
     '''
         Description: Custom DataLoader for LUCAS Dataset
     '''
@@ -48,6 +68,7 @@ class LUCASDataset(Dataset):
             scan = nib.load(image_dir)
 
         if self.transform:
+            scan = torch.unsqueeze(torch.tensor(scan), 0)
             scan = self.transform(scan)
         # show_slices(scan[0,20:56,:,:], total_cols=6)
 
@@ -61,6 +82,7 @@ class LUCASDataset(Dataset):
         N = float(sum(count))
         for i in range(2):
             weight_per_class[i] = N / float(count[i])
+        print(weight_per_class)
         weight = [0] * len(self.idx)
         for idx, val in enumerate(self.idx):
             weight[idx] = weight_per_class[self.labels[val][self.task]]
@@ -85,7 +107,7 @@ def show_slices(slices, total_cols=6):
 
 
 if __name__ == '__main__':
-    dataset = LUCASDataset('train_file.csv')
+    dataset = VGG16_loader('train_file.csv')
     epi_img_data = dataset[0]['image']
     """ Function to display row of image slices """
     show_slices([epi_img_data[:, :, :, a_slice] for a_slice in range(epi_img_data.shape[-1])])

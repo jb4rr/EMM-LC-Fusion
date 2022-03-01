@@ -23,7 +23,7 @@ from scipy.ndimage.interpolation import zoom
 import random
 import math
 import logging
-sample_factor = 0.6
+sample_factor = 0.5
 path.append('util/')
 
 
