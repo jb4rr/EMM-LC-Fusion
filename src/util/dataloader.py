@@ -18,7 +18,7 @@ class DAE(Dataset):
         self.labels = pd.read_csv(os.path.join(self.root, csv_file))
         self.labels = self.labels.set_index('patient_id').T.to_dict('list')
         self.idx = self.idx = list(self.labels.keys())
-        self.factors = [2,3,4,5,6,7,8,9,11,13,14,15,16]
+        self.factors = config.FACT_IDX
 
     def __len__(self):
         return len(self.labels)

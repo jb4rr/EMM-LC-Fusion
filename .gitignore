@@ -1,5 +1,5 @@
 venv
 src/__pycache__
 src/util/test
-src/models/logs
+src/models/
 images

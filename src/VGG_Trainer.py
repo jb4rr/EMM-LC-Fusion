@@ -90,7 +90,7 @@ def main(load_path=None, train=True):
             model.load_state_dict(checkpoint['model_state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             epoch = checkpoint['epoch']
-        writer = SummaryWriter('./models/logs/runs')
+        writer = SummaryWriter('./models/VGG/logs/runs')
         for epoch in range(epoch, config.NUM_EPOCHS):
             print(f"Epoch {epoch}")
 
@@ -116,7 +116,7 @@ def main(load_path=None, train=True):
 
             # Implemenent is best
             if is_best:
-                save_model(model, epoch, test_loss, optimizer, model_path="src/models/Best.pth")
+                save_model(model, epoch, test_loss, optimizer, model_path="src/models/vgg/checkpoints/Best.pth")
     else:
         pass
         # Implement Model Predict
