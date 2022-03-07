@@ -12,11 +12,11 @@ from torch import nn, optim, cuda, no_grad
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from sklearn.metrics import roc_auc_score, average_precision_score, f1_score
+from sklearn.metrics import f1_score
 
 from util.dataloader import DAE
 from util.models import DenoisingAutoEncoder
-from util.utils import AverageMeter
+from util.utils import AverageMeter, save_model
 
 
 def main():
@@ -53,10 +53,9 @@ def train(model, criterion, optimizer, loader, test_loader, writer):
     # Set Model to update gradients
 
     # Define Logging Parameters
-    print_stats = 2
+    print_stats = 10
     epoch_loss = AverageMeter()
-    batch_loss = AverageMeter()
-
+    best_f1 = 0
     # Add Tensorboard Logging
 
     for epoch in range(0, 100):
@@ -72,8 +71,7 @@ def train(model, criterion, optimizer, loader, test_loader, writer):
 
             # Add L1 Regularization Term to Prevent Creating an Identity Function
             l1_lambda = 0.001
-            l1_norm = sum(p.abs().sum()
-                          for p in model.parameters())
+            l1_norm = sum(p.abs().sum() for p in model.parameters())
 
             loss = loss + l1_lambda * l1_norm
 
@@ -84,46 +82,59 @@ def train(model, criterion, optimizer, loader, test_loader, writer):
             # Adam Step
             optimizer.step()
 
-            # Update Average Loss Counters
-            batch_loss.update(loss.item())
+            # Update Average Loss Counter
             epoch_loss.update(loss.item())
 
-            if batch_loss.count % print_stats == 0:
+            if batch_idx % print_stats == 0:
                 writer.add_scalar('training loss', loss.item(), epoch * len(loader) + batch_idx)
                 text = '{} -- [{}/{} ({:.0f}%)]\tLoss: {:.6f}'
                 print(text.format(time.strftime("%H:%M:%S"), (batch_idx + 1), (len(loader)),
-                                  100. * (batch_idx + 1) / (len(loader)), batch_loss.avg))
+                                  100. * (batch_idx + 1) / (len(loader)), loss.item()))
 
         # End Of Epoch :
-        batch_loss.reset()
         print(f"Loss in epoch {epoch} :::: {epoch_loss.avg / len(loader)}")
 
-        # Test Model?
-        test(model, criterion, test_loader, writer, epoch=epoch)
+        # Test Model
+        test_loss, f1 = test(model, criterion, test_loader, writer, epoch=epoch)
+
+        # Save Model
+
+        is_best = best_f1 < f1
+        best_f1 = max(best_f1, f1)
+        if is_best:
+            save_model(model, epoch, test_loss, optimizer, model_path="./models/DAE/checkpoints/DAE.pth")
+
+        epoch_loss.reset()
 
 
 def test(model, criterion, loader, writer, epoch=0):
     model.eval()
     # Define Logging Parameters
-    print_stats = 5
     epoch_loss = AverageMeter()
     labels, scores, predictions = [], [], []
-    count, correct = 0, 0
 
     for batch_idx, data in enumerate(loader):
 
         # Get Data
         data = data.to(device=config.DEVICE).float()
-        labels.extend([data.tolist()[i] for i in range(len(data))])
+        labels.extend(data.tolist())
 
         with no_grad():
             out = model(data)
 
         loss = criterion(out, data)
+        predictions.extend((out >= 0.5).float().tolist())
         epoch_loss.update(loss.item())
+    labels = list(itertools.chain(*list(itertools.chain(*labels))))
+    predictions = list(itertools.chain(*list(itertools.chain(*predictions))))
 
-    print('--- Val: \tLoss: {:.6f} ---'.format(epoch_loss.avg))
-    writer.add_scalar('val loss', epoch_loss.avg, epoch * len(loader))
+    f1 = f1_score(labels, predictions)
+    print("\n------ VALIDATION ------")
+    print('      Loss: {:.6f}'.format(epoch_loss.avg))
+    print('   F-Score: {:.6f}\n'.format(f1))
+    writer.add_scalar('val loss', epoch_loss.avg, epoch)
+    writer.add_scalar('f1 Score', f1, epoch)
+    return epoch_loss.avg, f1
 
 
 if __name__ == "__main__":
