@@ -5,6 +5,7 @@
 
 import config
 import time
+import itertools
 
 import torch
 from torch import nn, optim, cuda, no_grad
@@ -22,10 +23,11 @@ def main():
     # Define Dataset
     train_data = DAE('train_descriptor.csv', transform=False)
     test_data = DAE('test_descriptor.csv', transform=False)
+
     # Define DataLoader
-    train_loader = DataLoader(train_data, batch_size=32,
+    train_loader = DataLoader(train_data, batch_size=8,
                               num_workers=config.NUM_WORKERS, shuffle=True)
-    test_loader = DataLoader(test_data, batch_size=32,
+    test_loader = DataLoader(test_data, batch_size=8,
                              num_workers=config.NUM_WORKERS, shuffle=True)
 
     # Define Model
@@ -38,17 +40,17 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=config.LR)
 
     # Train Model
+    writer = SummaryWriter('./models/DAE/logs/runs')
     cuda.empty_cache()
-    train(model, criterion, optimizer, train_loader, test_loader)
+    train(model, criterion, optimizer, train_loader, test_loader, writer)
 
     # Test Model
     cuda.empty_cache()
-    test(model, criterion, optimizer, test_loader)
+    test(model, criterion, test_loader, writer, epoch=0)
 
 
-def train(model, criterion, optimizer, loader, test_loader):
+def train(model, criterion, optimizer, loader, test_loader, writer):
     # Set Model to update gradients
-
 
     # Define Logging Parameters
     print_stats = 2
@@ -56,7 +58,6 @@ def train(model, criterion, optimizer, loader, test_loader):
     batch_loss = AverageMeter()
 
     # Add Tensorboard Logging
-    writer = SummaryWriter('./models/DAE/logs/runs')
 
     for epoch in range(0, 100):
         model.train()
@@ -98,12 +99,11 @@ def train(model, criterion, optimizer, loader, test_loader):
         print(f"Loss in epoch {epoch} :::: {epoch_loss.avg / len(loader)}")
 
         # Test Model?
-        test(model, criterion, test_loader)
+        test(model, criterion, test_loader, writer, epoch=epoch)
 
 
-def test(model, criterion, loader):
+def test(model, criterion, loader, writer, epoch=0):
     model.eval()
-
     # Define Logging Parameters
     print_stats = 5
     epoch_loss = AverageMeter()
@@ -114,32 +114,16 @@ def test(model, criterion, loader):
 
         # Get Data
         data = data.to(device=config.DEVICE).float()
-        labels.append(data.tolist()[0])
+        labels.extend([data.tolist()[i] for i in range(len(data))])
 
         with no_grad():
             out = model(data)
 
         loss = criterion(out, data)
         epoch_loss.update(loss.item())
-        prediction = torch.round(out).float()
-        prediction[prediction <= 0.0] = 0
-        predictions.append(prediction.tolist()[0])
-        scores.extend(out.tolist())
-        count += prediction.sum()
-        correct += (prediction * data).sum()
 
     print('--- Val: \tLoss: {:.6f} ---'.format(epoch_loss.avg))
-
-    # Metrics
-    accuracy = sum(1 for x, y in zip(labels, predictions) if x == y) / len(labels)
-
-    print(f"ACCURACY: {accuracy}")
-    print(count)
-    print("___________________________")
-
-
-
-
+    writer.add_scalar('val loss', epoch_loss.avg, epoch * len(loader))
 
 
 if __name__ == "__main__":

@@ -72,7 +72,7 @@ class DenoisingAutoEncoder(nn.Module):
         super(DenoisingAutoEncoder, self).__init__()
         n = len(config.FACT_IDX)
         self.encoder = nn.Sequential(
-            # Randomly Dropout 1 Neuron to add 'noise'
+            # Randomly Dropout 1 Neuron to add 'noise' Default 0.2
             nn.Dropout(0.2),
             nn.Linear(n, n*10),
             nn.Linear(n*10, n*15),
@@ -83,6 +83,7 @@ class DenoisingAutoEncoder(nn.Module):
             nn.Linear(n*20, n*15),
             nn.Linear(n*15, n*10),
             nn.Linear(n*10, n),
+            nn.Sigmoid()
         )
 
     def forward(self, x):

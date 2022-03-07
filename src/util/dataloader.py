@@ -1,6 +1,7 @@
 from sys import path
 from src import config
 from skimage import color
+from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import Dataset
 from nibabel import processing
 import os
@@ -12,11 +13,19 @@ import torch
 
 path.append('util/')
 
+
 class DAE(Dataset):
     def __init__(self, csv_file, transform=None):
         self.root = config.DATA_DIR
         self.labels = pd.read_csv(os.path.join(self.root, csv_file))
+
         self.labels = self.labels.set_index('patient_id').T.to_dict('list')
+
+        # Replace with value 1 if greater than 1 (Lack of Clarity In Dataset as to what these values mean)
+
+        for key, value in self.labels.items():
+            self.labels[key] = [1 if ele > 1 else ele for ele in self.labels[key]]
+
         self.idx = self.idx = list(self.labels.keys())
         self.factors = config.FACT_IDX
 
@@ -111,6 +120,3 @@ if __name__ == '__main__':
     epi_img_data = dataset[0]['image']
     """ Function to display row of image slices """
     show_slices([epi_img_data[:, :, :, a_slice] for a_slice in range(epi_img_data.shape[-1])])
-
-
-

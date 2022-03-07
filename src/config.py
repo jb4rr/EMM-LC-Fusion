@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+
 if torch.cuda.is_available():
     DEVICE = "cuda"
 else:
@@ -15,4 +16,5 @@ LR = 0.001
 
 # DAE FACTORS INDEX
 
-FACT_IDX = [i for i in range(1,75)] #[2,3,4,5,6,7,8,9,10,12,14,15,16]
+FACT_IDX = [i for i in range(2,75)] #[2,3,4,5,6,7,8,9,10,12,14,15,16]
+print(FACT_IDX)
