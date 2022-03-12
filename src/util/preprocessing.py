@@ -17,7 +17,7 @@ from pathlib import Path as Plib
 from src import config
 from sys import path
 from skimage import measure
-from scipy.ndimage.morphology import binary_dilation,generate_binary_structure
+from scipy.ndimage.morphology import binary_dilation, generate_binary_structure
 from skimage.morphology import convex_hull_image
 from scipy.ndimage.interpolation import zoom
 import random
@@ -27,8 +27,9 @@ sample_factor = 0.5
 path.append('util/')
 
 
-def binarize_per_slice(image, spacing, intensity_th=-600, sigma=1, area_th=10, eccen_th=0.99, bg_patch_size=10):
+def binarize_per_slice(image, spacing, intensity_th=-600, sigma=1, area_th=30, eccen_th=0.99, bg_patch_size=10):
     bw = np.zeros(image.shape, dtype=bool)
+
     # prepare a mask, with all corner values set to nan
     image_size = image.shape[1]
     grid_axis = np.linspace(-image_size / 2 + 0.5, image_size / 2 - 0.5, image_size)
@@ -58,11 +59,8 @@ def binarize_per_slice(image, spacing, intensity_th=-600, sigma=1, area_th=10, e
     return bw
 
 
-def all_slice_analysis(bw, spacing, cut_num=0, vol_limit=None, area_th=6e3, dist_th=30):
+def all_slice_analysis(bw, spacing, cut_num=0, vol_limit=[0.68, 8.2], area_th=6e3, dist_th=62):
     # in some cases, several top layers need to be removed first
-    if vol_limit is None:
-        vol_limit = [0.68, 8.2]
-
     if cut_num > 0:
         bw0 = np.copy(bw)
         bw[-cut_num:] = False
@@ -101,7 +99,7 @@ def all_slice_analysis(bw, spacing, cut_num=0, vol_limit=None, area_th=6e3, dist
             valid_label.add(vol.label)
 
     bw = np.in1d(label, list(valid_label)).reshape(label.shape)
-
+    show_slices([bw[int(bw.shape[0] / 2), :, :]])
     # fill back the parts removed earlier
     if cut_num > 0:
         # bw1 is bw with removed slices, bw2 is a dilated version of bw, part of their intersection is returned as final mask
@@ -216,20 +214,22 @@ def mask_extraction(scan, slices):
     # Remove 2D connected components smaller than 30 mm2 or having eccentricity greater than 0.99
     # Only 3D Components not touching the matrix corner and having a volume between 0.68 L and 7.5 L are kept.
     # Calculate min distance from image center
-    # Select Slices with area > 600mm^2
+    # Select Slices with area > 6000mm^2
     # Remove if avg min distance > 62mm
     # Union remaining components for the final mask
     spacing = scan.header.get_zooms()
     spacing = np.array(spacing, dtype=np.float32)
-    #spacing = np.roll(spacing, 1)
+    spacing = np.roll(spacing, 1)
     bw = binarize_per_slice(slices, spacing)
+    print(spacing)
+    print(bw.shape)
     flag = 0
     cut_num = 0
     cut_step = 2
     bw0 = np.copy(bw)
     while flag == 0 and cut_num < bw.shape[0]:
         bw = np.copy(bw0)
-        bw, flag = all_slice_analysis(bw, spacing, cut_num=cut_num, vol_limit=[0.6, 8.2])
+        bw, flag = all_slice_analysis(bw, spacing, cut_num=cut_num, vol_limit=[0.6, 7.5])
         cut_num = cut_num + cut_step
 
     bw = fill_hole(bw)
@@ -312,6 +312,7 @@ class LiaoTransform(object):
         #                                           GET SLICES
         self.slices = self.scan.get_fdata()
         self.slices = np.stack([(self.slices[:, :, s]) for s in range(self.slices.shape[-1])]).astype(np.int16)
+        #show_slices(self.slices[[0+20,int(self.slices.shape[0]/2),self.slices.shape[0]-21]])
         exampled_preprocessing.append(self.scan.get_fdata()[:, :, int(sample_factor * self.slices.shape[0])])
         # -------------------------------------------------------------------------------------------------------#
         #                                           CREATE MASK
@@ -322,9 +323,9 @@ class LiaoTransform(object):
         exampled_preprocessing.append(Mask[int(sample_factor * self.slices.shape[0]), :, :])
         # show_slices(exampled_preprocessing, total_cols=2, titles=['Original', 'Mask'])
         # -------------------------------------------------------------------------------------------------------#
-        xx, yy, zz = np.where(Mask)
+        #xx, yy, zz = np.where(Mask)
         # Error if mask is none.
-        box = np.array([[np.min(xx), np.max(xx)], [np.min(yy), np.max(yy)], [np.min(zz), np.max(zz)]])
+        #box = np.array([[np.min(xx), np.max(xx)], [np.min(yy), np.max(yy)], [np.min(zz), np.max(zz)]])
 
         dm1 = process_mask(m1)
         dm2 = process_mask(m2)
@@ -344,7 +345,7 @@ class LiaoTransform(object):
         sliceim[bones] = pad_value
         self.slices = sliceim
         logging.debug("Completed Preprocessing")
-        # show_slices(exampled_preprocessing, total_cols=3)
+        show_slices(exampled_preprocessing, total_cols=3)
 
         # --------------------------------------------If SAVE = True -----------------------------------------------#
         if save:
@@ -450,35 +451,38 @@ if __name__ == "__main__":
 
     # Set directory to save to
     saved_dir = str(os.path.join(config.DATA_DIR, "Preprocessed-LIAO"))
-    get_sample(saved_dir, num_samples=25)
+    #get_sample(saved_dir, num_samples=25)
     # Initialise Class Method
     preprocessor = LiaoTransform()
+    preprocessor(nib.load(r"E:\University of Gloucestershire\Year 4\Dissertation\SCANS\4118768.nii.gz"))
+
 
     # Get File List
     files = Plib(scans_dir).glob('*')
 
+
     # Iterate through files
-    for file in files:
+    #for file in files:
 
         # Get File Name
-        name = str(file).split("\\")[-1].split('.')[0] + ".npy"
+    #    name = str(file).split("\\")[-1].split('.')[0] + ".npy"
         # Create Save Directory
-        saved_path = str(os.path.join(saved_dir, name))
-        if not os.path.exists(saved_path) and name not in open("./failed.txt").read():
-            logging.debug(f"Processing {file}")
-            try:
+    #    saved_path = str(os.path.join(saved_dir, name))
+    #    if not os.path.exists(saved_path) and name not in open("./failed.txt").read():
+    #        logging.debug(f"Processing {file}")
+    #        try:
                 # Process File
-                preprocessor(nib.load(file), save=saved_path)
+    #            preprocessor(nib.load(file), save=saved_path)
 
-            except:
+    #        except:
                 # If Error, skip pre-processing and append file name to failed.txt
-                logging.warning(f"FAILED: Skipping {file}")
-                f = open("./failed.txt", "a")
-                f.write('\n')
-                f.write(name)
-                f.close()
-        else:
+    #           logging.warning(f"FAILED: Skipping {file}")
+    #            f = open("./failed.txt", "a")
+    #            f.write('\n')
+    #            f.write(name)
+    #            f.close()
+    #    else:
             # Supports pausing and restarting of pre-processing
-            logging.debug(f"{file} already processed")
+    #        logging.debug(f"{file} already processed")
 
-    get_sample(saved_dir, num_samples=25)
+    #get_sample(saved_dir, num_samples=25)

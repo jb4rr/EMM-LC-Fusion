@@ -18,8 +18,10 @@ class DAE(Dataset):
     def __init__(self, csv_file, transform=None):
         self.root = config.DATA_DIR
         self.labels = pd.read_csv(os.path.join(self.root, csv_file))
+
         # Remove Redundant Columns
         self.labels = self.labels.drop(['Benign_cons', 'Malignant_gra', 'x<3mm_mass'], axis=1)
+
         self.labels = self.labels.set_index('patient_id').T.to_dict('list')
 
         # Replace with value 1 if greater than 1 (Lack of Clarity In Dataset as to what these values mean)
@@ -28,7 +30,6 @@ class DAE(Dataset):
             self.labels[key] = [1 if ele > 1 else ele for ele in self.labels[key]]
 
         self.idx = self.idx = list(self.labels.keys())
-        self.factors = config.FACT_IDX
 
     def __len__(self):
         return len(self.labels)
@@ -38,7 +39,7 @@ class DAE(Dataset):
         patient = self.idx[idx]
 
         # Exclude Cancer Diagnosis From Training
-        label = [list(self.labels[patient])[i] for i in self.factors]
+        label = self.labels[patient][1:-1]
         label = torch.unsqueeze(torch.tensor(label), 0)
         return label
 

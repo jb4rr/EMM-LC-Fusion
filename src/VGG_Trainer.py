@@ -25,7 +25,7 @@ def train_model(epoch, model, optim, criterion, train_loader, writer):
     model.train()
     epoch_loss = AverageMeter()
     batch_loss = AverageMeter()
-    print_stats = 5  # Every 1 Percent Print Stats
+    print_stats = 5  # Every 5 Percent Print Stats
 
     for batch_idx, (data, targets) in enumerate(train_loader):
         data = data.to(device=config.DEVICE).float()
@@ -98,7 +98,7 @@ def main(load_path=None, train=True):
             print(f"Loss in epoch {epoch} :::: {train_loss / len(train_loader)}")
 
             # Save Model
-            test_loss, f1, flag = test(model, test_loader, '../models/logs/', criterion, training=True)
+            test_loss, f1, flag = test(model, test_loader, '../models/logs/', criterion, writer,training=True)
 
             is_best = False
             if flag:
@@ -117,12 +117,11 @@ def main(load_path=None, train=True):
             # Implemenent is best
             if is_best:
                 save_model(model, epoch, test_loss, optimizer, model_path="src/models/vgg/checkpoints/Best.pth")
-    else:
-        pass
-        # Implement Model Predict
+            else:
+                save_model(model, epoch, test_loss, optimizer, model_path="./models/DAE/checkpoints/N20/LAST_DAE.pth")
 
 
-def test(model, loader, save_path, criterion, training=True):
+def test(model, loader, save_path, criterion, writer,training=True, epoch=0):
     model.eval()
     epoch_loss = AverageMeter()
     count, correct = 0, 0
@@ -156,6 +155,11 @@ def test(model, loader, save_path, criterion, training=True):
     print(f" ROC_AUC: {roc} \n     AP: {ap} \n     F1: {f1}\n ACCURACY: {accuracy}")
     print(count)
     print("___________________________")
+
+    writer.add_scalar('training loss',
+                      epoch_loss.avg,
+                      epoch)
+
     if not training:
         print('ROC', roc, 'AP', ap, 'F1', f1)
         rows = zip(patients, scores)

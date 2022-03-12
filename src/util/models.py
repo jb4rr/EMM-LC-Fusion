@@ -57,9 +57,9 @@ class VGG16(nn.Module):
         x = self.maxpool(x)
         x = x.reshape(x.shape[0], -1)
         x = F.relu(self.fc1(x))
-        x = F.dropout3d(x, 0.5)
+        x = F.dropout(x, 0.5)
         x = F.relu(self.fc2(x))
-        x = F.dropout3d(x, 0.5)
+        x = F.dropout(x, 0.5)
         x = self.fc3(x)
         return x
 
@@ -70,19 +70,19 @@ class DenoisingAutoEncoder(nn.Module):
     '''
     def __init__(self):
         super(DenoisingAutoEncoder, self).__init__()
-        n = len(config.FACT_IDX)
+        n = config.NUM_FEATURES
         self.encoder = nn.Sequential(
             # Randomly Dropout 1 Neuron to add 'noise' Default 0.2
             nn.Dropout(0.2),
-            nn.Linear(n, n*10),
-            nn.Linear(n*10, n*15),
-            nn.Linear(n*15, n*20),
+            nn.Linear(n, n*2),
+            nn.Linear(n*2, n*5),
+            nn.Linear(n*5, n*10),
         )
 
         self.decoder = nn.Sequential(
-            nn.Linear(n*20, n*15),
-            nn.Linear(n*15, n*10),
-            nn.Linear(n*10, n),
+            nn.Linear(n*10, n*5),
+            nn.Linear(n*5, n*2),
+            nn.Linear(n*2, n),
             nn.Sigmoid()
         )
 

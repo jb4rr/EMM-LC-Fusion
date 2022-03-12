@@ -7,10 +7,10 @@ import config
 import time
 import itertools
 
-#import torch
-#from torch import nn, optim, cuda, no_grad
-#from torch.utils.data import DataLoader
-#from torch.utils.tensorboard import SummaryWriter
+import torch
+from torch import nn, optim, cuda, no_grad
+from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 
 from sklearn.metrics import f1_score
 
@@ -53,12 +53,12 @@ def train(model, criterion, optimizer, loader, test_loader, writer):
     # Set Model to update gradients
 
     # Define Logging Parameters
-    print_stats = 10
+    print_stats = 50
     epoch_loss = AverageMeter()
     best_f1 = 0
     # Add Tensorboard Logging
 
-    for epoch in range(0, 100):
+    for epoch in range(0, config.NUM_EPOCHS):
         model.train()
         for batch_idx, data in enumerate(loader):
 
@@ -86,7 +86,7 @@ def train(model, criterion, optimizer, loader, test_loader, writer):
             epoch_loss.update(loss.item())
 
             if batch_idx % print_stats == 0:
-                writer.add_scalar('training loss', loss.item(), epoch * len(loader) + batch_idx)
+                writer.add_scalar('Training Loss', loss.item(), epoch * len(loader) + batch_idx)
                 text = '{} -- [{}/{} ({:.0f}%)]\tLoss: {:.6f}'
                 print(text.format(time.strftime("%H:%M:%S"), (batch_idx + 1), (len(loader)),
                                   100. * (batch_idx + 1) / (len(loader)), loss.item()))
@@ -99,11 +99,12 @@ def train(model, criterion, optimizer, loader, test_loader, writer):
 
         # Save Model
 
-        is_best = best_f1 < f1
+        is_best = best_f1 <= f1
         best_f1 = max(best_f1, f1)
         if is_best:
-            save_model(model, epoch, test_loss, optimizer, model_path="./models/DAE/checkpoints/DAE.pth")
-
+            save_model(model, epoch, test_loss, optimizer, model_path="./models/DAE/checkpoints/N10/BEST_DAE.pth")
+        else:
+            save_model(model, epoch, test_loss, optimizer, model_path="./models/DAE/checkpoints/N10/LAST_DAE.pth")
         epoch_loss.reset()
 
 
@@ -132,22 +133,25 @@ def test(model, criterion, loader, writer, epoch=0):
     print("\n------ VALIDATION ------")
     print('      Loss: {:.6f}'.format(epoch_loss.avg))
     print('   F-Score: {:.6f}\n'.format(f1))
-    writer.add_scalar('val loss', epoch_loss.avg, epoch)
-    writer.add_scalar('f1 Score', f1, epoch)
+    writer.add_scalar('Validation Loss', epoch_loss.avg, epoch)
+    writer.add_scalar('F1 Score', f1, epoch)
     return epoch_loss.avg, f1
 
 
-if __name__ == "__main__":
+def visualise_data():
     import seaborn as sn
     import matplotlib.pyplot as plt
     import pandas as pd
 
-    df = pd.read_csv(r'D:\University of Gloucestershire\Year 4\Dissertation\train_descriptor.csv')
-    # Remove Columns with all Zeros
-    df = df.drop(['Benign_cons', 'Malignant_gra','x<3mm_mass'], axis=1)
+    df = pd.read_csv(r'E:\University of Gloucestershire\Year 4\Dissertation\train_descriptor.csv')
     sn.heatmap(df.corr())
-    plt.savefig('./correlation_matrix.png')
+    plt.savefig('./correlation_matrix_all.png')
+    # Remove Columns with all Zeros
+    #df = df.drop(['Benign_cons', 'Malignant_gra','x<3mm_mass'], axis=1)
+    #sn.heatmap(df.corr())
+    #plt.savefig('./correlation_matrix_less.png')
     plt.show()
 
-    main()
+if __name__ == "__main__":
+    visualise_data()
 

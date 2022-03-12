@@ -14,6 +14,6 @@ IMAGE_SIZE = np.asarray((64, 64, 64))
 N_CLASSES = 1
 LR = 0.001
 
-# DAE FACTORS INDEX
-# Make sure that Cancer Columns is excluded from this index.
-FACT_IDX = [i for i in range(2,79)] #[2,3,4,5,6,7,8,9,10,12,14,15,16]
+# Number of Features
+NUM_FEATURES = 74
+
