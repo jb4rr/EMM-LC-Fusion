@@ -7,10 +7,10 @@ import config
 import time
 import itertools
 
-import torch
-from torch import nn, optim, cuda, no_grad
-from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
+#import torch
+#from torch import nn, optim, cuda, no_grad
+#from torch.utils.data import DataLoader
+#from torch.utils.tensorboard import SummaryWriter
 
 from sklearn.metrics import f1_score
 
@@ -138,4 +138,16 @@ def test(model, criterion, loader, writer, epoch=0):
 
 
 if __name__ == "__main__":
+    import seaborn as sn
+    import matplotlib.pyplot as plt
+    import pandas as pd
+
+    df = pd.read_csv(r'D:\University of Gloucestershire\Year 4\Dissertation\train_descriptor.csv')
+    # Remove Columns with all Zeros
+    df = df.drop(['Benign_cons', 'Malignant_gra','x<3mm_mass'], axis=1)
+    sn.heatmap(df.corr())
+    plt.savefig('./correlation_matrix.png')
+    plt.show()
+
     main()
+

@@ -18,7 +18,8 @@ class DAE(Dataset):
     def __init__(self, csv_file, transform=None):
         self.root = config.DATA_DIR
         self.labels = pd.read_csv(os.path.join(self.root, csv_file))
-
+        # Remove Redundant Columns
+        self.labels = self.labels.drop(['Benign_cons', 'Malignant_gra', 'x<3mm_mass'], axis=1)
         self.labels = self.labels.set_index('patient_id').T.to_dict('list')
 
         # Replace with value 1 if greater than 1 (Lack of Clarity In Dataset as to what these values mean)
