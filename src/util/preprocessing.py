@@ -322,9 +322,9 @@ class LiaoTransform(object):
         exampled_preprocessing.append(Mask[int(sample_factor * self.slices.shape[0]), :, :])
         # show_slices(exampled_preprocessing, total_cols=2, titles=['Original', 'Mask'])
         # -------------------------------------------------------------------------------------------------------#
-        #xx, yy, zz = np.where(Mask)
+        xx, yy, zz = np.where(Mask)
         # Error if mask is none.
-        #box = np.array([[np.min(xx), np.max(xx)], [np.min(yy), np.max(yy)], [np.min(zz), np.max(zz)]])
+        box = np.array([[np.min(xx), np.max(xx)], [np.min(yy), np.max(yy)], [np.min(zz), np.max(zz)]])
 
         dm1 = process_mask(m1)
         dm2 = process_mask(m2)
@@ -452,7 +452,7 @@ if __name__ == "__main__":
     saved_dir = str(os.path.join(config.DATA_DIR, "Preprocessed-LIAO-L-Thresh"))
 
     # Get Sample
-    get_sample(r"D:\University of Gloucestershire\Year 4\Dissertation\Preprocessed-LIAO-L-Thresh", num_samples=25)
+    get_sample(r"E:\University of Gloucestershire\Year 4\Dissertation\Preprocessed-LIAO-L-Thresh", num_samples=100)
 
     # Initialise Class Method
     preprocessor = LiaoTransform()
