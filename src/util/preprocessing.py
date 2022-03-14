@@ -27,7 +27,7 @@ sample_factor = 0.5
 path.append('util/')
 
 
-def binarize_per_slice(image, spacing, intensity_th=-600, sigma=1, area_th=30, eccen_th=0.99, bg_patch_size=10):
+def binarize_per_slice(image, spacing, intensity_th=-500, sigma=1, area_th=5, eccen_th=.999, bg_patch_size=1):
     bw = np.zeros(image.shape, dtype=bool)
 
     # prepare a mask, with all corner values set to nan
@@ -59,7 +59,7 @@ def binarize_per_slice(image, spacing, intensity_th=-600, sigma=1, area_th=30, e
     return bw
 
 
-def all_slice_analysis(bw, spacing, cut_num=0, vol_limit=[0.68, 8.2], area_th=6e3, dist_th=62):
+def all_slice_analysis(bw, spacing, cut_num=0, vol_limit=[0.68, 8.2], area_th=3e3, dist_th=62):
     # in some cases, several top layers need to be removed first
     if cut_num > 0:
         bw0 = np.copy(bw)
@@ -99,7 +99,6 @@ def all_slice_analysis(bw, spacing, cut_num=0, vol_limit=[0.68, 8.2], area_th=6e
             valid_label.add(vol.label)
 
     bw = np.in1d(label, list(valid_label)).reshape(label.shape)
-    show_slices([bw[int(bw.shape[0] / 2), :, :]])
     # fill back the parts removed earlier
     if cut_num > 0:
         # bw1 is bw with removed slices, bw2 is a dilated version of bw, part of their intersection is returned as final mask
@@ -221,15 +220,15 @@ def mask_extraction(scan, slices):
     spacing = np.array(spacing, dtype=np.float32)
     spacing = np.roll(spacing, 1)
     bw = binarize_per_slice(slices, spacing)
-    print(spacing)
-    print(bw.shape)
+
     flag = 0
-    cut_num = 0
+    cut_num = 2
     cut_step = 2
     bw0 = np.copy(bw)
+
     while flag == 0 and cut_num < bw.shape[0]:
         bw = np.copy(bw0)
-        bw, flag = all_slice_analysis(bw, spacing, cut_num=cut_num, vol_limit=[0.6, 7.5])
+        bw, flag = all_slice_analysis(bw, spacing, cut_num=cut_num, vol_limit=[0, 7.5])
         cut_num = cut_num + cut_step
 
     bw = fill_hole(bw)
@@ -312,7 +311,7 @@ class LiaoTransform(object):
         #                                           GET SLICES
         self.slices = self.scan.get_fdata()
         self.slices = np.stack([(self.slices[:, :, s]) for s in range(self.slices.shape[-1])]).astype(np.int16)
-        #show_slices(self.slices[[0+20,int(self.slices.shape[0]/2),self.slices.shape[0]-21]])
+        #show_slices([self.slices[i] for i in range(0,self.slices.shape[0],5)])
         exampled_preprocessing.append(self.scan.get_fdata()[:, :, int(sample_factor * self.slices.shape[0])])
         # -------------------------------------------------------------------------------------------------------#
         #                                           CREATE MASK
@@ -345,16 +344,16 @@ class LiaoTransform(object):
         sliceim[bones] = pad_value
         self.slices = sliceim
         logging.debug("Completed Preprocessing")
-        show_slices(exampled_preprocessing, total_cols=3)
+        #show_slices(exampled_preprocessing, total_cols=3)
 
         # --------------------------------------------If SAVE = True -----------------------------------------------#
         if save:
-            logging.debug(f"Saving Image in {path}")
+            logging.debug(f"Saving Image in {save}")
             self.save_as_numpy(save)
         return self.slices
 
-    def save_as_numpy(self, path):
-        np.save(path, self.slices)
+    def save_as_numpy(self, im_path):
+        np.save(im_path, self.slices)
 
 
 def show_slices(slices, total_cols=6, titles=['Original', 'Mask', 'Output'], save_fig=False):
@@ -450,39 +449,46 @@ if __name__ == "__main__":
     scans_dir = str(os.path.join(config.DATA_DIR, "SCANS"))
 
     # Set directory to save to
-    saved_dir = str(os.path.join(config.DATA_DIR, "Preprocessed-LIAO"))
-    #get_sample(saved_dir, num_samples=25)
+    saved_dir = str(os.path.join(config.DATA_DIR, "Preprocessed-LIAO-L-Thresh"))
+
+    # Get Sample
+    get_sample(r"D:\University of Gloucestershire\Year 4\Dissertation\Preprocessed-LIAO-L-Thresh", num_samples=25)
+
     # Initialise Class Method
     preprocessor = LiaoTransform()
-    preprocessor(nib.load(r"E:\University of Gloucestershire\Year 4\Dissertation\SCANS\4118768.nii.gz"))
 
+    # Load 1 Previous Scan
+    #scan = np.load(r"D:\University of Gloucestershire\Year 4\Dissertation\Preprocessed-LIAO\4047389.npy")
+    #plt.imshow(scan[int(sample_factor * scan.shape[0]), :, :], cmap="gray")
+    #plt.show()
+
+    # See If it Improves
+    #preprocessor(nib.load(r"D:\University of Gloucestershire\Year 4\Dissertation\SCANS\4047389.nii.gz"))
 
     # Get File List
     files = Plib(scans_dir).glob('*')
 
-
     # Iterate through files
-    #for file in files:
+    for file in files:
 
         # Get File Name
-    #    name = str(file).split("\\")[-1].split('.')[0] + ".npy"
+        name = str(file).split("\\")[-1].split('.')[0] + ".npy"
         # Create Save Directory
-    #    saved_path = str(os.path.join(saved_dir, name))
-    #    if not os.path.exists(saved_path) and name not in open("./failed.txt").read():
-    #        logging.debug(f"Processing {file}")
-    #        try:
+        saved_path = str(os.path.join(saved_dir, name))
+        if not os.path.exists(saved_path) and name not in open("./L-Thresh-Failed.txt").read():
+            logging.debug(f"Processing {file}")
+            try:
                 # Process File
-    #            preprocessor(nib.load(file), save=saved_path)
-
-    #        except:
+                preprocessor(nib.load(file), save=saved_path)
+            except:
                 # If Error, skip pre-processing and append file name to failed.txt
-    #           logging.warning(f"FAILED: Skipping {file}")
-    #            f = open("./failed.txt", "a")
-    #            f.write('\n')
-    #            f.write(name)
-    #            f.close()
-    #    else:
+                logging.warning(f"FAILED: Skipping {file}")
+                f = open("./L-Thresh-Failed.txt", "a")
+                f.write('\n')
+                f.write(name)
+                f.close()
+        else:
             # Supports pausing and restarting of pre-processing
-    #        logging.debug(f"{file} already processed")
+            logging.debug(f"{file} already processed")
 
     #get_sample(saved_dir, num_samples=25)
