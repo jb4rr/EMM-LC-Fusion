@@ -25,7 +25,6 @@ class DAE(Dataset):
         self.labels = self.labels.set_index('patient_id').T.to_dict('list')
 
         # Replace with value 1 if greater than 1 (Lack of Clarity In Dataset as to what these values mean)
-
         for key, value in self.labels.items():
             self.labels[key] = [1 if ele > 1 else ele for ele in self.labels[key]]
 
@@ -72,7 +71,7 @@ class VGG16_Loader(Dataset):
         label = self.labels[patient][self.task]
 
         if self.preprocessed == True:
-            image_dir = os.path.join(self.root, "Preprocessed-LIAO", str(patient) + ".npy")
+            image_dir = os.path.join(self.root, "Preprocessed-LIAO-L-Thresh", str(patient) + ".npy")
             scan = np.load(image_dir)
         else:
             image_dir = os.path.join(self.root, "SCANS", str(patient) + ".nii.gz")
@@ -118,7 +117,7 @@ def show_slices(slices, total_cols=6):
 
 
 if __name__ == '__main__':
-    dataset = VGG16_loader('train_file.csv')
+    dataset = VGG16_Loader('train_file.csv')
     epi_img_data = dataset[0]['image']
     """ Function to display row of image slices """
     show_slices([epi_img_data[:, :, :, a_slice] for a_slice in range(epi_img_data.shape[-1])])

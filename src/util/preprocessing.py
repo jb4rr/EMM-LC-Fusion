@@ -369,7 +369,7 @@ def show_slices(slices, total_cols=6, titles=['Original', 'Mask', 'Output'], sav
     axs = axs.flatten()
     if len(titles) == len(slices):
         for img, ax, title in zip(slices, axs, titles):
-            ax.title.set_text(title)
+            ax.set_title(title, size=5)
             ax.axis("off")
             ax.imshow(img, cmap="gray")
         if save_fig:
@@ -435,7 +435,7 @@ def get_sample(saved_dir, num_samples=16, sample_point=0.5):
     for i in files_index:
         # Load Numpy Data
         scan = np.load(str(flst[i]))
-        img_list.append(scan[int(scan.shape[1] * sample_point), :, :])
+        img_list.append(scan[0, int(scan.shape[1] * sample_point), :, :])
         # Get name for each Numpy Image
         name_list.append(str(flst[i]).split('\\')[-1].split('.')[0])
     # Show Slices
@@ -452,7 +452,7 @@ if __name__ == "__main__":
     saved_dir = str(os.path.join(config.DATA_DIR, "Preprocessed-LIAO-L-Thresh"))
 
     # Get Sample
-    get_sample(r"E:\University of Gloucestershire\Year 4\Dissertation\Preprocessed-LIAO-L-Thresh", num_samples=100)
+    get_sample(r"D:\University of Gloucestershire\Year 4\Dissertation\Preprocessed-LIAO-OLD", num_samples=25)
 
     # Initialise Class Method
     preprocessor = LiaoTransform()

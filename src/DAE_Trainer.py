@@ -7,10 +7,10 @@ import config
 import time
 import itertools
 
-import torch
-from torch import nn, optim, cuda, no_grad
-from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
+#import torch
+#from torch import nn, optim, cuda, no_grad
+#from torch.utils.data import DataLoader
+#from torch.utils.tensorboard import SummaryWriter
 
 from sklearn.metrics import f1_score
 
@@ -143,12 +143,15 @@ def visualise_data():
     import matplotlib.pyplot as plt
     import pandas as pd
 
-    df = pd.read_csv(r'E:\University of Gloucestershire\Year 4\Dissertation\train_descriptor.csv')
-    sn.heatmap(df.corr())
-    plt.savefig('./correlation_matrix_all.png')
+    df = pd.read_csv(r'D:\University of Gloucestershire\Year 4\Dissertation\train_descriptor.csv')
+    #sn.heatmap(df.corr()[['Cancer']])
+    #plt.savefig('./correlation_matrix_all.png')
     # Remove Columns with all Zeros
-    #df = df.drop(['Benign_cons', 'Malignant_gra','x<3mm_mass'], axis=1)
-    #sn.heatmap(df.corr())
+    df = df.drop(['Benign_cons', 'Malignant_gra','x<3mm_mass', 'Index', 'patient_id'], axis=1)
+    df1 = df.iloc[:, 37:].copy()
+    #df1['Cancer'] = df['Cancer']
+    sn.set(font_scale=0.5)
+    sn.heatmap(df1.corr()[['Cancer']])
     #plt.savefig('./correlation_matrix_less.png')
     plt.show()
 

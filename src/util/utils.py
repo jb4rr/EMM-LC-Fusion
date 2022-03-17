@@ -19,11 +19,6 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 
-def save_model(model, epoch, loss, optim, model_path='models/default.pt'):
-    torch.save({
-        'epoch': epoch,
-        'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optim.state_dict(),
-        'loss': loss,
-    }, model_path)
+def save_model(state, model_path='models/default.pt'):
+    torch.save(state, model_path)
     print(f"Saved Epoch in {model_path}")

@@ -20,7 +20,6 @@ from util.models import VGG16
 from util.utils import AverageMeter, save_model
 
 
-
 def train_model(epoch, model, optim, criterion, train_loader, writer):
     model.train()
     epoch_loss = AverageMeter()
@@ -62,6 +61,7 @@ def train_model(epoch, model, optim, criterion, train_loader, writer):
 
 def main(load_path=None, train=True):
     print("Running...")
+    # Change CSV for Training
     train_data = VGG16_Loader('Processed-LIAO-CSV/train_file.csv', preprocessed=True, transform=transforms.Compose([Resize((64, 64, 64))]))
     test_data = VGG16_Loader('Processed-LIAO-CSV/test_file.csv', preprocessed=True, transform=transforms.Compose([Resize((64, 64, 64))]))
     print("Loaded Dataset")
@@ -90,14 +90,14 @@ def main(load_path=None, train=True):
             model.load_state_dict(checkpoint['model_state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             epoch = checkpoint['epoch']
+            best_f1 = checkpoint['f1']
         writer = SummaryWriter('./models/VGG/logs/runs')
         for epoch in range(epoch, config.NUM_EPOCHS):
             print(f"Epoch {epoch}")
 
             train_loss = train_model(epoch, model, optimizer, criterion, train_loader, writer)
-            print(f"Loss in epoch {epoch} :::: {train_loss / len(train_loader)}")
+            print(f"Loss in epoch {epoch} :::: {train_loss}")
 
-            # Save Model
             test_loss, f1, flag = test(model, test_loader, '../models/logs/', criterion, writer,training=True)
 
             is_best = False
@@ -116,9 +116,9 @@ def main(load_path=None, train=True):
 
             # Implemenent is best
             if is_best:
-                save_model(model, epoch, test_loss, optimizer, model_path="src/models/vgg/checkpoints/Best.pth")
+                save_model(state, model_path="src/models/vgg/checkpoints/Best.pth")
             else:
-                save_model(model, epoch, test_loss, optimizer, model_path="./models/DAE/checkpoints/N20/LAST_DAE.pth")
+                save_model(state, model_path="./models/DAE/checkpoints/N20/LAST_DAE.pth")
 
 
 def test(model, loader, save_path, criterion, writer,training=True, epoch=0):
@@ -156,20 +156,9 @@ def test(model, loader, save_path, criterion, writer,training=True, epoch=0):
     print(count)
     print("___________________________")
 
-    writer.add_scalar('training loss',
-                      epoch_loss.avg,
-                      epoch)
-
-    if not training:
-        print('ROC', roc, 'AP', ap, 'F1', f1)
-        rows = zip(patients, scores)
-        with open(os.path.join(save_path, 'confidence.csv'), "w") as f:
-            writer = csv.writer(f)
-            writer.writerow(['ROC:', roc])
-            writer.writerow(['AP:', ap])
-            writer.writerow(['F1:', f1])
-            for row in rows:
-                writer.writerow(row)
+    writer.add_scalar('training loss', epoch_loss.avg, epoch)
+    writer.add_scalar('ROC_AUC', roc, epoch)
+    writer.add_scalar('F1', f1, epoch)
 
     flag = True
     if count == 0 or count == len(loader.dataset):
