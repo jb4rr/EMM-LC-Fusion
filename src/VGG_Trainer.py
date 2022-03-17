@@ -41,20 +41,19 @@ def train_model(epoch, model, optim, criterion, train_loader, writer):
         # Adam Step
         optim.step()
 
-        batch_loss.update(loss.item())
+
         epoch_loss.update(loss.item())
 
-        if batch_loss.count % print_stats == 0:
+        if batch_idx % print_stats == 0:
             writer.add_scalar('training loss',
-                              batch_loss.avg,
+                              loss.item(),
                               epoch * len(train_loader) + batch_idx)
             text = '{} -- [{}/{} ({:.0f}%)]\tLoss: {:.6f}'
             print(text.format(
                 time.strftime("%H:%M:%S"), (batch_idx + 1),
                 (len(train_loader)), 100. * (batch_idx + 1) / (len(train_loader)),
-                batch_loss.avg))
+                loss.item()))
 
-    batch_loss.reset()
     print('--- Train: \tLoss: {:.6f} ---'.format(epoch_loss.avg))
     return epoch_loss.avg
 
@@ -62,8 +61,8 @@ def train_model(epoch, model, optim, criterion, train_loader, writer):
 def main(load_path=None, train=True):
     print("Running...")
     # Change CSV for Training
-    train_data = VGG16_Loader('Processed-LIAO-CSV/train_file.csv', preprocessed=True, transform=transforms.Compose([Resize((64, 64, 64))]))
-    test_data = VGG16_Loader('Processed-LIAO-CSV/test_file.csv', preprocessed=True, transform=transforms.Compose([Resize((64, 64, 64))]))
+    train_data = VGG16_Loader('train_file.csv', preprocessed=True, transform=transforms.Compose([Resize((64, 64, 64))]))
+    test_data = VGG16_Loader('test_file.csv', preprocessed=True, transform=transforms.Compose([Resize((64, 64, 64))]))
     print("Loaded Dataset")
 
     # Over Sampling due to lack of entries with cancer : Limitation -> May Produce Overfitting
@@ -91,14 +90,14 @@ def main(load_path=None, train=True):
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             epoch = checkpoint['epoch']
             best_f1 = checkpoint['f1']
-        writer = SummaryWriter('./models/VGG/logs/runs')
+        writer = SummaryWriter(config.DATA_DIR+'/models/VGG/logs/runs')
         for epoch in range(epoch, config.NUM_EPOCHS):
             print(f"Epoch {epoch}")
 
             train_loss = train_model(epoch, model, optimizer, criterion, train_loader, writer)
-            print(f"Loss in epoch {epoch} :::: {train_loss}")
+            print(f"Average Loss in epoch {epoch} :::: {train_loss}")
 
-            test_loss, f1, flag = test(model, test_loader, '../models/logs/', criterion, writer,training=True)
+            test_loss, f1, flag = test(model, test_loader, criterion, writer, epoch=epoch)
 
             is_best = False
             if flag:
@@ -114,14 +113,14 @@ def main(load_path=None, train=True):
                 'f1': f1,
                 'best_f1': best_f1}
 
-            # Implemenent is best
+            # Implement is best
             if is_best:
-                save_model(state, model_path="src/models/vgg/checkpoints/Best.pth")
+                save_model(state, model_path=config.DATA_DIR+"/models/VGG/checkpoints/Best.pth")
             else:
-                save_model(state, model_path="./models/DAE/checkpoints/N20/LAST_DAE.pth")
+                save_model(state, model_path=config.DATA_DIR+"/models/VGG/checkpoints/Last.pth")
 
 
-def test(model, loader, save_path, criterion, writer,training=True, epoch=0):
+def test(model, loader, criterion, writer, epoch=0):
     model.eval()
     epoch_loss = AverageMeter()
     count, correct = 0, 0
@@ -144,7 +143,8 @@ def test(model, loader, save_path, criterion, writer,training=True, epoch=0):
         count += pred.sum()
         correct += (pred * target).sum()
 
-    print('--- Val: \tLoss: {:.6f} ---'.format(epoch_loss.avg))
+    print(f"Epoch {epoch}")
+    print('Val:\n  Loss: {:.6f} ---'.format(epoch_loss.avg))
 
     # Metrics
     roc = roc_auc_score(labels, scores)
@@ -152,11 +152,10 @@ def test(model, loader, save_path, criterion, writer,training=True, epoch=0):
     f1 = f1_score(labels, predictions)
     accuracy = sum(1 for x, y in zip(labels, predictions) if x == y) / len(labels)
 
-    print(f" ROC_AUC: {roc} \n     AP: {ap} \n     F1: {f1}\n ACCURACY: {accuracy}")
+    print(f"ROC_AUC: {roc} \n     AP: {ap} \n     F1: {f1}\n ACCURACY: {accuracy}")
     print(count)
     print("___________________________")
 
-    writer.add_scalar('training loss', epoch_loss.avg, epoch)
     writer.add_scalar('ROC_AUC', roc, epoch)
     writer.add_scalar('F1', f1, epoch)
 
