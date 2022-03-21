@@ -443,7 +443,7 @@ def get_sample(saved_dir, num_samples=16, sample_point=0.5):
 
 if __name__ == "__main__":
     # Set Logging Level:
-    logging.basicConfig(format='%(asctime)s: %(message)s', level=logging.DEBUG, datefmt='%m/%d/%Y %I:%M:%S %p')
+    #logging.basicConfig(format='%(asctime)s: %(message)s', level=logging.DEBUG, datefmt='%m/%d/%Y %I:%M:%S %p')
 
     # Set RAW data file
     scans_dir = str(os.path.join(config.DATA_DIR, "SCANS"))
@@ -452,10 +452,10 @@ if __name__ == "__main__":
     saved_dir = str(os.path.join(config.DATA_DIR, "Preprocessed-LIAO-L-Thresh"))
 
     # Get Sample
-    get_sample(r"D:\University of Gloucestershire\Year 4\Dissertation\Preprocessed-LIAO-OLD", num_samples=25)
+    #get_sample(r"D:\University of Gloucestershire\Year 4\Dissertation\Preprocessed-LIAO-OLD", num_samples=25)
 
     # Initialise Class Method
-    preprocessor = LiaoTransform()
+    #preprocessor = LiaoTransform()
 
     # Load 1 Previous Scan
     #scan = np.load(r"D:\University of Gloucestershire\Year 4\Dissertation\Preprocessed-LIAO\4047389.npy")
@@ -469,26 +469,26 @@ if __name__ == "__main__":
     files = Plib(scans_dir).glob('*')
 
     # Iterate through files
-    for file in files:
+    #for file in files:
 
         # Get File Name
-        name = str(file).split("\\")[-1].split('.')[0] + ".npy"
+    #    name = str(file).split("\\")[-1].split('.')[0] + ".npy"
         # Create Save Directory
-        saved_path = str(os.path.join(saved_dir, name))
-        if not os.path.exists(saved_path) and name not in open("./L-Thresh-Failed.txt").read():
-            logging.debug(f"Processing {file}")
-            try:
+    #    saved_path = str(os.path.join(saved_dir, name))
+    #    if not os.path.exists(saved_path) and name not in open("./L-Thresh-Failed.txt").read():
+    #        logging.debug(f"Processing {file}")
+    #        try:
                 # Process File
-                preprocessor(nib.load(file), save=saved_path)
-            except:
+    #            preprocessor(nib.load(file), save=saved_path)
+    #        except:
                 # If Error, skip pre-processing and append file name to failed.txt
-                logging.warning(f"FAILED: Skipping {file}")
-                f = open("./L-Thresh-Failed.txt", "a")
-                f.write('\n')
-                f.write(name)
-                f.close()
-        else:
+    #            logging.warning(f"FAILED: Skipping {file}")
+    #            f = open("./L-Thresh-Failed.txt", "a")
+    #            f.write('\n')
+    #            f.write(name)
+    #            f.close()
+    #    else:
             # Supports pausing and restarting of pre-processing
-            logging.debug(f"{file} already processed")
+    #        logging.debug(f"{file} already processed")
 
     #get_sample(saved_dir, num_samples=25)

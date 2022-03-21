@@ -1,4 +1,4 @@
-from util.models import VGG16
+from util.nets.AlignedXception import AlignedXception
 from util.dataloader import VGG16_Loader
 from torchvision import transforms
 from torchio.transforms import Resize

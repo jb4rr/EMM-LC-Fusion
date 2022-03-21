@@ -14,21 +14,20 @@ from torch.utils.data import DataLoader, sampler
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 from sklearn.metrics import roc_auc_score, average_precision_score, f1_score
-from util.dataloader import VGG16_Loader
+from util.dataloader import EMM_LC_Fusion_Loader
 from util.preprocessing import LiaoTransform, MRIdataset
-from util.models import VGG16
+from util.nets import AlignedXception, DAE, Fusion
 from util.utils import AverageMeter, save_model
 
 
 def train_model(epoch, model, optim, criterion, train_loader, writer):
     model.train()
     epoch_loss = AverageMeter()
-    batch_loss = AverageMeter()
     print_stats = 5  # Every 5 Percent Print Stats
 
-    for batch_idx, (data, targets) in enumerate(train_loader):
-        data = data.to(device=config.DEVICE).float()
-        targets = targets.to(device=config.DEVICE).float()
+    for batch_idx, data in enumerate(train_loader):
+        data = data['scan'].to(device=config.DEVICE).float()
+        targets = data['label'].to(device=config.DEVICE).float()
 
         # Forward Pass
         scores = model(data)
@@ -61,8 +60,8 @@ def train_model(epoch, model, optim, criterion, train_loader, writer):
 def main(load_path=None, train=True):
     print("Running...")
     # Change CSV for Training
-    train_data = VGG16_Loader('train_file.csv', preprocessed=True, transform=transforms.Compose([Resize((64, 64, 64))]))
-    test_data = VGG16_Loader('test_file.csv', preprocessed=True, transform=transforms.Compose([Resize((64, 64, 64))]))
+    train_data = EMM_LC_Fusion_Loader(scan_csv='train_file.csv', transform=transforms.Compose([Resize((64, 64, 64))]))
+    test_data = EMM_LC_Fusion_Loader(scan_csv='test_file.csv', transform=transforms.Compose([Resize((64, 64, 64))]))
     print("Loaded Dataset")
 
     # Over Sampling due to lack of entries with cancer : Limitation -> May Produce Overfitting
@@ -71,7 +70,7 @@ def main(load_path=None, train=True):
     train_loader = DataLoader(train_data, sampler=w, batch_size=config.BATCH_SIZE, num_workers=config.NUM_WORKERS)
     test_loader = DataLoader(test_data, batch_size=config.BATCH_SIZE, num_workers=config.NUM_WORKERS)
 
-    model = VGG16()
+    model = AlignedXception()
     model = model.to(device=config.DEVICE)
     model = model.float()
 
@@ -126,11 +125,11 @@ def test(model, loader, criterion, writer, epoch=0):
     count, correct = 0, 0
     labels, patients, scores, predictions = [], [], [], []
 
-    for batch_idx, (data, targets) in enumerate(loader):
-        data = data.to(device=config.DEVICE).float()
-        target = targets.to(device=config.DEVICE).float()
+    for batch_idx, data in enumerate(loader):
+        data = data['scan'].to(device=config.DEVICE).float()
+        target = data['label'].to(device=config.DEVICE).float()
 
-        labels.extend(targets.tolist())
+        labels.extend(data['label'].tolist())
 
         with torch.no_grad():
             out = model(data)

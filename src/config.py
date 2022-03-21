@@ -6,7 +6,8 @@ if torch.cuda.is_available():
 else:
     DEVICE = "cpu"
 
-DATA_DIR = r"C:\Users\s1810355\OneDrive - University of Gloucestershire\University\Year 4\Sem 2\CT6039\Data"
+#DATA_DIR = r"C:\Users\s1810355\OneDrive - University of Gloucestershire\University\Year 4\Sem 2\CT6039\Data"
+DATA_DIR = r"D:\University of Gloucestershire\Year 4\Dissertation"
 BATCH_SIZE = 4
 NUM_WORKERS = 4
 NUM_EPOCHS = 50

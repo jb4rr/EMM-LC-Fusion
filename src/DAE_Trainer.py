@@ -7,23 +7,20 @@ import config
 import time
 import itertools
 
-#import torch
-#from torch import nn, optim, cuda, no_grad
-#from torch.utils.data import DataLoader
-#from torch.utils.tensorboard import SummaryWriter
-
+from torch import nn, optim, cuda, no_grad
+from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import f1_score
-
-from util.dataloader import DAE
-from util.models import DenoisingAutoEncoder
+from util.dataloader import EMM_LC_Fusion_Loader
+from util.nets.DAE import DenoisingAutoEncoder
 from util.utils import AverageMeter, save_model
 
 
 def main():
     # Define Dataset
-    train_data = DAE('train_descriptor.csv', transform=False)
-    test_data = DAE('test_descriptor.csv', transform=False)
-
+    train_data = EMM_LC_Fusion_Loader(desc_csv='train_descriptor.csv')
+    test_data = EMM_LC_Fusion_Loader(desc_csv='test_descriptor.csv')
+    print(len(train_data))
     # Define DataLoader
     train_loader = DataLoader(train_data, batch_size=8,
                               num_workers=config.NUM_WORKERS, shuffle=True)
@@ -63,7 +60,7 @@ def train(model, criterion, optimizer, loader, test_loader, writer):
         for batch_idx, data in enumerate(loader):
 
             # Get Data
-            data = data.to(device=config.DEVICE).float()
+            data = data['descriptor'].to(device=config.DEVICE).float()
 
             # Forward Pass
             scores = model(data)
@@ -117,7 +114,7 @@ def test(model, criterion, loader, writer, epoch=0):
     for batch_idx, data in enumerate(loader):
 
         # Get Data
-        data = data.to(device=config.DEVICE).float()
+        data = data['descriptor'].to(device=config.DEVICE).float()
         labels.extend(data.tolist())
 
         with no_grad():
@@ -156,5 +153,4 @@ def visualise_data():
     plt.show()
 
 if __name__ == "__main__":
-    visualise_data()
-
+    main()
