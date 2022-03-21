@@ -18,9 +18,9 @@ from util.utils import AverageMeter, save_model
 
 def main():
     # Define Dataset
-    train_data = EMM_LC_Fusion_Loader(desc_csv='train_descriptor.csv')
-    test_data = EMM_LC_Fusion_Loader(desc_csv='test_descriptor.csv')
-    print(len(train_data))
+    train_data = EMM_LC_Fusion_Loader(desc_csv='Preprocessed-LIAO-L-Thresh-CSV\\train_descriptor.csv')
+    test_data = EMM_LC_Fusion_Loader(desc_csv='Preprocessed-LIAO-L-Thresh-CSV\\test_descriptor.csv')
+
     # Define DataLoader
     train_loader = DataLoader(train_data, batch_size=8,
                               num_workers=config.NUM_WORKERS, shuffle=True)
@@ -37,7 +37,7 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=config.LR)
 
     # Train Model
-    writer = SummaryWriter('./models/DAE/logs/runs')
+    writer = SummaryWriter(config.DATA_DIR+"/models/DAE/checkpoints/N30/")
     cuda.empty_cache()
     train(model, criterion, optimizer, train_loader, test_loader, writer)
 
@@ -50,20 +50,20 @@ def train(model, criterion, optimizer, loader, test_loader, writer):
     # Set Model to update gradients
 
     # Define Logging Parameters
-    print_stats = 50
+    print_stats = 5
     epoch_loss = AverageMeter()
     best_f1 = 0
     # Add Tensorboard Logging
 
     for epoch in range(0, config.NUM_EPOCHS):
         model.train()
-        for batch_idx, data in enumerate(loader):
+        for batch_idx, sample in enumerate(loader):
 
             # Get Data
-            data = data['descriptor'].to(device=config.DEVICE).float()
+            data = sample['descriptor'].to(device=config.DEVICE).float()
 
-            # Forward Pass
-            scores = model(data)
+            # Forward Pass : DAE returns both encoded and decoded score. Ignore Encoded Here
+            _, scores = model(data)
             loss = criterion(scores, data)
 
             # Add L1 Regularization Term to Prevent Creating an Identity Function
@@ -94,14 +94,24 @@ def train(model, criterion, optimizer, loader, test_loader, writer):
         # Test Model
         test_loss, f1 = test(model, criterion, test_loader, writer, epoch=epoch)
 
-        # Save Model
 
+        # Save Model
         is_best = best_f1 <= f1
         best_f1 = max(best_f1, f1)
+
+        state = {
+            'epoch': epoch,
+            'state_dict': model.state_dict(),
+            'optimizer': optimizer.state_dict(),
+            'loss': [epoch_loss.avg, test_loss],
+            'lr': config.LR,
+            'f1': f1,
+            'best_f1': best_f1}
+
         if is_best:
-            save_model(model, epoch, test_loss, optimizer, model_path="./models/DAE/checkpoints/N10/BEST_DAE.pth")
+            save_model(state, model_path=config.DATA_DIR+"/models/DAE/checkpoints/N30/BEST_DAE.pth")
         else:
-            save_model(model, epoch, test_loss, optimizer, model_path="./models/DAE/checkpoints/N10/LAST_DAE.pth")
+            save_model(state, model_path=config.DATA_DIR+"/models/DAE/checkpoints/N30/LAST_DAE.pth")
         epoch_loss.reset()
 
 
@@ -111,14 +121,14 @@ def test(model, criterion, loader, writer, epoch=0):
     epoch_loss = AverageMeter()
     labels, scores, predictions = [], [], []
 
-    for batch_idx, data in enumerate(loader):
+    for batch_idx, sample in enumerate(loader):
 
         # Get Data
-        data = data['descriptor'].to(device=config.DEVICE).float()
+        data = sample['descriptor'].to(device=config.DEVICE).float()
         labels.extend(data.tolist())
 
         with no_grad():
-            out = model(data)
+            _, out = model(data)
 
         loss = criterion(out, data)
         predictions.extend((out >= 0.5).float().tolist())

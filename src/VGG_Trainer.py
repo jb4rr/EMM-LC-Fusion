@@ -16,7 +16,7 @@ from tqdm import tqdm
 from sklearn.metrics import roc_auc_score, average_precision_score, f1_score
 from util.dataloader import EMM_LC_Fusion_Loader
 from util.preprocessing import LiaoTransform, MRIdataset
-from util.nets import AlignedXception, DAE, Fusion
+from util.nets.Fusion import Fusion
 from util.utils import AverageMeter, save_model
 
 
@@ -28,9 +28,10 @@ def train_model(epoch, model, optim, criterion, train_loader, writer):
     for batch_idx, data in enumerate(train_loader):
         data = data['scan'].to(device=config.DEVICE).float()
         targets = data['label'].to(device=config.DEVICE).float()
+        descriptor = data['descriptor'].to(device=config.DEVICE).float()
 
         # Forward Pass
-        scores = model(data)
+        scores = model(data, descriptor)
         loss = criterion(scores, targets.unsqueeze(1))
 
         # Backward Pass
@@ -39,7 +40,6 @@ def train_model(epoch, model, optim, criterion, train_loader, writer):
 
         # Adam Step
         optim.step()
-
 
         epoch_loss.update(loss.item())
 
@@ -60,8 +60,13 @@ def train_model(epoch, model, optim, criterion, train_loader, writer):
 def main(load_path=None, train=True):
     print("Running...")
     # Change CSV for Training
-    train_data = EMM_LC_Fusion_Loader(scan_csv='train_file.csv', transform=transforms.Compose([Resize((64, 64, 64))]))
-    test_data = EMM_LC_Fusion_Loader(scan_csv='test_file.csv', transform=transforms.Compose([Resize((64, 64, 64))]))
+    train_data = EMM_LC_Fusion_Loader(scan_csv='Preprocessed-LIAO-L-Thresh-CSV\\train_file.csv',
+                                      desc_csv='Preprocessed-LIAO-L-Thresh-CSV\\train_descriptor.csv',
+                                      transform=transforms.Compose([Resize((64, 64, 64))]))
+    test_data = EMM_LC_Fusion_Loader(scan_csv='Preprocessed-LIAO-L-Thresh-CSV\\test_file.csv',
+                                     desc_csv='Preprocessed-LIAO-L-Thresh-CSV\\test_descriptor.csv',
+                                     transform=transforms.Compose([Resize((64, 64, 64))]))
+    print(train_data[0])
     print("Loaded Dataset")
 
     # Over Sampling due to lack of entries with cancer : Limitation -> May Produce Overfitting
@@ -70,7 +75,7 @@ def main(load_path=None, train=True):
     train_loader = DataLoader(train_data, sampler=w, batch_size=config.BATCH_SIZE, num_workers=config.NUM_WORKERS)
     test_loader = DataLoader(test_data, batch_size=config.BATCH_SIZE, num_workers=config.NUM_WORKERS)
 
-    model = AlignedXception()
+    model = Fusion()
     model = model.to(device=config.DEVICE)
     model = model.float()
 
@@ -89,7 +94,7 @@ def main(load_path=None, train=True):
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             epoch = checkpoint['epoch']
             best_f1 = checkpoint['f1']
-        writer = SummaryWriter(config.DATA_DIR+'/models/VGG/logs/runs')
+        writer = SummaryWriter(config.DATA_DIR + '/models/VGG/logs/runs')
         for epoch in range(epoch, config.NUM_EPOCHS):
             print(f"Epoch {epoch}")
 
@@ -114,9 +119,9 @@ def main(load_path=None, train=True):
 
             # Implement is best
             if is_best:
-                save_model(state, model_path=config.DATA_DIR+"/models/VGG/checkpoints/Best.pth")
+                save_model(state, model_path=config.DATA_DIR + "/models/VGG/checkpoints/Best.pth")
             else:
-                save_model(state, model_path=config.DATA_DIR+"/models/VGG/checkpoints/Last.pth")
+                save_model(state, model_path=config.DATA_DIR + "/models/VGG/checkpoints/Last.pth")
 
 
 def test(model, loader, criterion, writer, epoch=0):
@@ -163,6 +168,7 @@ def test(model, loader, criterion, writer, epoch=0):
         flag = False
 
     return epoch_loss.avg, f1, flag
+
 
 if __name__ == "__main__":
     print(config.DEVICE)

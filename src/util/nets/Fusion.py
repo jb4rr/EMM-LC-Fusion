@@ -1,21 +1,25 @@
 import torch.nn as nn
 import torch
 import src.config as config
+from .DAE import DenoisingAutoEncoder
+from .AlignedXception import AlignedXception
 
-from DAE import DenoisingAutoEncoder
-from AlignedXception import AlignedXception
 
 
 class Fusion(nn.Module):
-    def __init__(self, num_classes=2):
+    def __init__(self, dae_model=config.DATA_DIR+'\\models\\DAE\\checkpoints\\N20\\LAST_DAE.pth'):
         super(Fusion, self).__init__()
         # Images
         BatchNorm = nn.InstanceNorm3d
         filters = [32, 64, 128, 256, 256, 512]
         self.backbone = AlignedXception(BatchNorm, filters)
 
-        # Descriptor
-        self.fc_d = DenoisingAutoEncoder()
+        # Load Pretrained Model
+        DAE = DenoisingAutoEncoder()
+        DAE.load_state_dict(torch.load(dae_model)['state_dict'])
+        DAE.eval()
+
+        self.fc_d = DAE
         # self.fc_d = nn.Linear(76, 512)
 
         # Combination

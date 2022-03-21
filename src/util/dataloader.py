@@ -17,6 +17,10 @@ class EMM_LC_Fusion_Loader:
         self.root = config.DATA_DIR
         self.desc_labels = None
         self.scan_labels = None
+        self.scan = None
+        self.task = -2  # Used to Index Column -2 = Cancer
+        self.transform = transform
+
         if desc_csv is not None:
             # Format and Remove Redundant Columns From DataFrame
             self.desc_labels = pd.read_csv(os.path.join(self.root, desc_csv))
@@ -27,16 +31,16 @@ class EMM_LC_Fusion_Loader:
             for key, value in self.desc_labels.items():
                 self.desc_labels[key] = [1 if ele > 1 else ele for ele in self.desc_labels[key]]
 
-            self.idx = self.idx = list(self.desc_labels.keys())
+            self.idx = list(self.desc_labels.keys())
+
 
         if scan_csv is not None:
             self.scan_labels = pd.read_csv(os.path.join(self.root, scan_csv))
             self.scan_labels = self.scan_labels.set_index('patient_id').T.to_dict('list')
-            self.idx = self.idx = list(self.scan_labels.keys())
+            self.idx = list(self.scan_labels.keys())
             self.weights = self.weights_balanced()
 
-        self.task = -2  # Used to Index Column -2 = Cancer
-        self.transform = transform
+
 
     def __len__(self):
         # Return Length of Labels Regardless of what Loader is Loading
@@ -48,22 +52,27 @@ class EMM_LC_Fusion_Loader:
             idx = idx.tolist()
 
         patient = self.idx[idx]
-
         if self.desc_labels is not None:
-            self.desc_labels = self.desc_labels[patient][1:-1]
-            self.desc_labels = torch.unsqueeze(torch.tensor(self.desc_labels), 0)
+            desc_labels = self.desc_labels[patient][1:-1]
+            desc_labels = torch.unsqueeze(torch.tensor(desc_labels), 0)
+        else:
+            desc_labels = torch.empty(1)
 
         if self.scan_labels is not None:
-            self.scan_labels = self.scan_labels[patient][self.task]
+            scan_labels = self.scan_labels[patient][self.task]
+            scan_labels = float(scan_labels)
 
             preprocessed_img_dir = os.path.join(self.root, "Preprocessed-LIAO-L-Thresh", str(patient) + ".npy")
-            self.scan = np.load(preprocessed_img_dir)
+            scan = np.load(preprocessed_img_dir)
 
             if self.transform:
-                self.scan = torch.unsqueeze(torch.tensor(self.scan), 0)
-                self.scan = self.transform(self.scan)
+                scan = torch.unsqueeze(torch.tensor(scan), 0)
+                scan = self.transform(scan)
+        else:
+            scan = torch.empty(1)
+            scan_labels = torch.empty(1)
 
-        return {'scan': self.scan, 'label': float(self.scan_labels), 'descriptor': self.desc_labels}
+        return {'scan': scan, 'label': scan_labels, 'descriptor': desc_labels, 'id': patient}
 
     def weights_balanced(self):
         count = [0] * 2
@@ -73,7 +82,6 @@ class EMM_LC_Fusion_Loader:
         N = float(sum(count))
         for i in range(2):
             weight_per_class[i] = N / float(count[i])
-        print(weight_per_class)
         weight = [0] * len(self.idx)
         for idx, val in enumerate(self.idx):
             weight[idx] = weight_per_class[self.scan_labels[val][self.task]]
@@ -87,7 +95,6 @@ class DAE(Dataset):
 
         # Remove Redundant Columns
         self.labels = self.labels.drop(['Benign_cons', 'Malignant_gra', 'x<3mm_mass'], axis=1)
-
         self.labels = self.labels.set_index('patient_id').T.to_dict('list')
 
         # Replace with value 1 if greater than 1 (Lack of Clarity In Dataset as to what these values mean)
