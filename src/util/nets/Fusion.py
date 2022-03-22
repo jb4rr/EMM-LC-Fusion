@@ -11,7 +11,7 @@ class Fusion(nn.Module):
         super(Fusion, self).__init__()
         # Images
         BatchNorm = nn.InstanceNorm3d
-        filters = [32, 64, 128, 256, 256, 512]
+        filters = [32, 64, 128, 128, 256, 512]
         self.backbone = AlignedXception(BatchNorm, filters)
 
         # Load Pretrained Model
@@ -23,10 +23,9 @@ class Fusion(nn.Module):
         # self.fc_d = nn.Linear(76, 512)
 
         # Combination
-
-        self._fc0 = nn.Linear(filters[-1] * 4 * 4 * 4 + 1480, filters[-1])
+        self._fc0 = nn.Linear(filters[-2] * 4 * 4 * 4 + 1480, filters[-1])
         self._dropout = nn.Dropout(0.2)
-        self._fc = nn.Linear(filters[-1], 1)
+        self._fc = nn.Linear(filters[-1], 2)
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x, y):
@@ -47,7 +46,7 @@ class Fusion(nn.Module):
 
 if __name__ == '__main__':
     model = Fusion()
-    img_input, label_input = torch.rand((1, 1, 256, 256, 256)), torch.rand((1,1,config.NUM_FEATURES))
+    img_input, label_input = torch.rand((2, 1, 128, 128, 128)), torch.rand((2,1,config.NUM_FEATURES))
     out = model(img_input, label_input)
     print(out.shape)
     print(out)

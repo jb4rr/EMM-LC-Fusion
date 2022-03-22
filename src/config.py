@@ -6,9 +6,8 @@ if torch.cuda.is_available():
 else:
     DEVICE = "cpu"
 
-#DATA_DIR = r"C:\Users\s1810355\OneDrive - University of Gloucestershire\University\Year 4\Sem 2\CT6039\Data"
 DATA_DIR = r"E:\University of Gloucestershire\Year 4\Dissertation\Data"
-BATCH_SIZE = 4
+BATCH_SIZE = 2
 NUM_WORKERS = 4
 NUM_EPOCHS = 50
 IMAGE_SIZE = np.asarray((64, 64, 64))
@@ -17,4 +16,5 @@ LR = 0.001
 
 # Number of Features
 NUM_FEATURES = 74
+
 

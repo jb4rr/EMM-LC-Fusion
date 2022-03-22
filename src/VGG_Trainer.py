@@ -5,68 +5,44 @@ import config
 import torch
 import torch.nn as nn
 import time
-import os
-import csv
+import torch.nn.functional as F
+import torch.backends.cudnn as cudnn
+import numpy as np
 from torch.optim import Adam
-from torchio.transforms import Resize
+from torchio.transforms import Resize, RandomFlip, RandomAffine
 from torchvision import transforms
 from torch.utils.data import DataLoader, sampler
 from torch.utils.tensorboard import SummaryWriter
-from tqdm import tqdm
 from sklearn.metrics import roc_auc_score, average_precision_score, f1_score
 from util.dataloader import EMM_LC_Fusion_Loader
-from util.preprocessing import LiaoTransform, MRIdataset
+
 from util.nets.Fusion import Fusion
 from util.utils import AverageMeter, save_model
 
-
-def train_model(epoch, model, optim, criterion, train_loader, writer):
-    model.train()
-    epoch_loss = AverageMeter()
-    print_stats = 5  # Every 5 Percent Print Stats
-
-    for batch_idx, data in enumerate(train_loader):
-        data = data['scan'].to(device=config.DEVICE).float()
-        targets = data['label'].to(device=config.DEVICE).float()
-        descriptor = data['descriptor'].to(device=config.DEVICE).float()
-
-        # Forward Pass
-        scores = model(data, descriptor)
-        loss = criterion(scores, targets.unsqueeze(1))
-
-        # Backward Pass
-        optim.zero_grad()
-        loss.backward()
-
-        # Adam Step
-        optim.step()
-
-        epoch_loss.update(loss.item())
-
-        if batch_idx % print_stats == 0:
-            writer.add_scalar('training loss',
-                              loss.item(),
-                              epoch * len(train_loader) + batch_idx)
-            text = '{} -- [{}/{} ({:.0f}%)]\tLoss: {:.6f}'
-            print(text.format(
-                time.strftime("%H:%M:%S"), (batch_idx + 1),
-                (len(train_loader)), 100. * (batch_idx + 1) / (len(train_loader)),
-                loss.item()))
-
-    print('--- Train: \tLoss: {:.6f} ---'.format(epoch_loss.avg))
-    return epoch_loss.avg
-
-
 def main(load_path=None, train=True):
     print("Running...")
+
+    np.random.seed(12345)
+    torch.manual_seed(12345)
+    torch.cuda.manual_seed_all(12345)
+
+    cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = True
+
     # Change CSV for Training
     train_data = EMM_LC_Fusion_Loader(scan_csv='Preprocessed-LIAO-L-Thresh-CSV\\train_file.csv',
                                       desc_csv='Preprocessed-LIAO-L-Thresh-CSV\\train_descriptor.csv',
-                                      transform=transforms.Compose([Resize((64, 64, 64))]))
+                                      transform=transforms.Compose([RandomFlip(2, flip_probability=0.5),
+                                                                    RandomAffine(degrees=(-20, 20, 0, 0, 0, 0),
+                                                                                 default_pad_value=170),
+                                                                    Resize((128, 128, 128))]))
     test_data = EMM_LC_Fusion_Loader(scan_csv='Preprocessed-LIAO-L-Thresh-CSV\\test_file.csv',
                                      desc_csv='Preprocessed-LIAO-L-Thresh-CSV\\test_descriptor.csv',
-                                     transform=transforms.Compose([Resize((64, 64, 64))]))
-    print(train_data[0])
+                                     transform=transforms.Compose([RandomFlip(2, flip_probability=0.5),
+                                                                   RandomAffine(degrees=(-20, 20, 0, 0, 0, 0),
+                                                                                default_pad_value=170),
+                                                                   Resize((128, 128, 128))]))
+    train_data[0]
     print("Loaded Dataset")
 
     # Over Sampling due to lack of entries with cancer : Limitation -> May Produce Overfitting
@@ -80,7 +56,7 @@ def main(load_path=None, train=True):
     model = model.float()
 
     criterion = nn.BCEWithLogitsLoss()
-    optimizer = Adam(model.parameters(), lr=config.LR)
+    optimizer = Adam(model.parameters(), lr=config.LR, weight_decay=1e-5)
 
     epoch = 0
     best_f1 = 0
@@ -94,6 +70,9 @@ def main(load_path=None, train=True):
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             epoch = checkpoint['epoch']
             best_f1 = checkpoint['f1']
+
+            model.load_state_dict(checkpoint['model_state_dict'])
+
         writer = SummaryWriter(config.DATA_DIR + '/models/VGG/logs/runs')
         for epoch in range(epoch, config.NUM_EPOCHS):
             print(f"Epoch {epoch}")
@@ -119,9 +98,52 @@ def main(load_path=None, train=True):
 
             # Implement is best
             if is_best:
-                save_model(state, model_path=config.DATA_DIR + "/models/VGG/checkpoints/Best.pth")
+                # Only Save after 25 epochs
+                if epoch > int(config.NUM_EPOCHS /2 ):
+                    save_model(state, model_path=config.DATA_DIR + "/models/VGG/checkpoints/Best.pth")
             else:
                 save_model(state, model_path=config.DATA_DIR + "/models/VGG/checkpoints/Last.pth")
+
+
+def train_model(epoch, model, optim, criterion, train_loader, writer):
+    model.train()
+    epoch_loss = AverageMeter()
+    print_stats = 5  # Every 5 Percent Print Stats
+
+    scaler = torch.cuda.amp.GradScaler()
+
+    for batch_idx, sample in enumerate(train_loader):
+        data = sample['scan'].to(device=config.DEVICE).float()
+        targets = sample['label'].to(device=config.DEVICE).float()
+        descriptor = sample['descriptor'].to(device=config.DEVICE).float()
+        targets = torch.stack([1 - targets, targets], dim=1)
+        optim.zero_grad()
+        # Forward Pass
+        with torch.cuda.amp.autocast():
+            scores = model(data, descriptor)
+            loss = criterion(scores, targets)
+
+        # Backward Pass
+        scaler.scale(loss).backward()  # loss.backward()
+
+        # Adam Step
+        scaler.step(optim)
+        scaler.update()        #optim.step()
+
+        epoch_loss.update(loss.item())
+
+        if batch_idx % print_stats == 0:
+            writer.add_scalar('training loss',
+                              epoch_loss.avg,
+                              epoch * len(train_loader) + batch_idx)
+            text = '{} -- [{}/{} ({:.0f}%)]\tLoss: {:.6f}'
+            print(text.format(
+                time.strftime("%H:%M:%S"), (batch_idx + 1),
+                (len(train_loader)), 100. * (batch_idx + 1) / (len(train_loader)),
+                loss.item()))
+
+    print('--- Train: \tLoss: {:.6f} ---'.format(epoch_loss.avg))
+    return epoch_loss.avg
 
 
 def test(model, loader, criterion, writer, epoch=0):
@@ -130,22 +152,25 @@ def test(model, loader, criterion, writer, epoch=0):
     count, correct = 0, 0
     labels, patients, scores, predictions = [], [], [], []
 
-    for batch_idx, data in enumerate(loader):
-        data = data['scan'].to(device=config.DEVICE).float()
-        target = data['label'].to(device=config.DEVICE).float()
-
-        labels.extend(data['label'].tolist())
+    for batch_idx, sample in enumerate(loader):
+        data = sample['scan'].to(device=config.DEVICE).float()
+        target = sample['label'].to(device=config.DEVICE).float()
+        descriptor = sample['descriptor'].to(device=config.DEVICE).float()
+        labels.extend(sample['label'].tolist())
 
         with torch.no_grad():
-            out = model(data)
-
-        loss = criterion(out, target.unsqueeze(1))
+            out = model(data, descriptor)
+        loss = criterion(out, torch.stack([1 - target, target], dim=1))
         epoch_loss.update(loss.item())
-        pred = (out > 0).float()
+
+        confidence = F.softmax(out, dim=1)
+        scores.extend(confidence[:, 1].tolist())
+
+        pred = torch.argmax(confidence, dim=1)
         predictions.extend(pred.tolist())
-        scores.extend(out.tolist())
         count += pred.sum()
         correct += (pred * target).sum()
+
 
     print(f"Epoch {epoch}")
     print('Val:\n  Loss: {:.6f} ---'.format(epoch_loss.avg))
@@ -157,11 +182,11 @@ def test(model, loader, criterion, writer, epoch=0):
     accuracy = sum(1 for x, y in zip(labels, predictions) if x == y) / len(labels)
 
     print(f"ROC_AUC: {roc} \n     AP: {ap} \n     F1: {f1}\n ACCURACY: {accuracy}")
-    print(count)
     print("___________________________")
 
     writer.add_scalar('ROC_AUC', roc, epoch)
     writer.add_scalar('F1', f1, epoch)
+    writer.add_scalar('Validation Loss', epoch_loss.avg, epoch)
 
     flag = True
     if count == 0 or count == len(loader.dataset):

@@ -114,7 +114,7 @@ class AlignedXception(nn.Module):
         x = self.block1(x)
         x = self.block2(x)
         x = self.block3(x)
-        x = self.block4(x)
+        #x = self.block4(x)
         return self.relu(x)
 
     def _init_weight(self):
@@ -129,8 +129,8 @@ class AlignedXception(nn.Module):
 
 
 if __name__ == '__main__':
-    filters = [8, 16, 32, 64, 128, 256, 512]
+    filters = [8, 16, 32, 64, 128, 256, 256]
     model = AlignedXception(BatchNorm=nn.InstanceNorm3d, filters=filters)
-    input = torch.rand(1, 1, 256, 256, 256)
+    input = torch.rand(1, 1, 128, 128, 128)
     output = model(input)
     print(output.size())
