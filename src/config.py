@@ -7,7 +7,7 @@ else:
     DEVICE = "cpu"
 
 DATA_DIR = r"E:\University of Gloucestershire\Year 4\Dissertation\Data"
-BATCH_SIZE = 2
+BATCH_SIZE = 3
 NUM_WORKERS = 4
 NUM_EPOCHS = 50
 IMAGE_SIZE = np.asarray((64, 64, 64))

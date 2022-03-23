@@ -11,7 +11,7 @@ import torch
 path.append('util/')
 
 
-class EMM_LC_Fusion_Loader:
+class EMM_LC_Fusion_Loader(Dataset):
     def __init__(self, scan_csv=None, desc_csv=None, transform=None):
         # Set Root Data Directory
         self.root = config.DATA_DIR

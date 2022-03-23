@@ -11,7 +11,7 @@ class Fusion(nn.Module):
         super(Fusion, self).__init__()
         # Images
         BatchNorm = nn.InstanceNorm3d
-        filters = [32, 64, 128, 128, 256, 512]
+        filters = [32, 64, 128, 128, 256, 256]
         self.backbone = AlignedXception(BatchNorm, filters)
 
         # Load Pretrained Model
@@ -19,25 +19,31 @@ class Fusion(nn.Module):
         DAE.load_state_dict(torch.load(dae_model)['state_dict'])
         DAE.eval()
 
-        self.fc_d = DAE
-        # self.fc_d = nn.Linear(76, 512)
+        self.fc_d = DAE # == Feature Extraction
+        #self.fc_d = nn.Linear(74, 512) # == Simple Feature
 
         # Combination
-        self._fc0 = nn.Linear(filters[-2] * 4 * 4 * 4 + 1480, filters[-1])
+        self._fc0 = nn.Linear(filters[-1] * 4 * 4 * 4 + 1480, filters[-1]) #1480 where N = 20
         self._dropout = nn.Dropout(0.2)
         self._fc = nn.Linear(filters[-1], 2)
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x, y):
         # Images
+        # ---------For Simple Fusion -----------#
         x = self.backbone(x)
         x = x.view(x.shape[0], -1)
 
         # Descriptor index [0] for encoded output, index [1] for decoded output
+        # --------- For Simple Fusion ----------#
+        # y = self.relu(self.fc_d(y))
+        # y = torch.squeeze(y, dim=1)
+
+        # ----------- For DAE Fusion ---------- #
         y = self.relu(self.fc_d(y)[0])
         y = y.view(y.shape[0], -1)
 
-        # Combination
+        # Combination via concatenation
         x = self.relu(self._fc0(torch.cat([x, y], dim=1)))
         x = self._dropout(x)
         x = self._fc(x)
