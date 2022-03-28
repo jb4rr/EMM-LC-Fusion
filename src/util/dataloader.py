@@ -10,6 +10,7 @@ import torch
 
 path.append('util/')
 
+# CHANGED FOR BASELINE MODEL
 
 class EMM_LC_Fusion_Loader(Dataset):
     def __init__(self, scan_csv=None, desc_csv=None, transform=None):
