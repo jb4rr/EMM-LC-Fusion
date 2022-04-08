@@ -98,6 +98,10 @@ class AlignedXception(nn.Module):
         self.block4 = Block(filters[4], filters[5], reps=3, stride=2,
                             BatchNorm=BatchNorm)
 
+        # Final Block for prediction
+        self.final = nn.Sequential(nn.Linear(filters[-1] * 2 * 2 * 2, filters[-1]),
+                                   nn.Dropout(0.2),
+                                   nn.Linear(filters[-1], 2))
         # Init weights
         self._init_weight()
 
@@ -111,11 +115,20 @@ class AlignedXception(nn.Module):
         x = self.relu(x)
 
         x = self.block0(x)
-        x = self.block1(x)
-        x = self.block2(x)
-        x = self.block3(x)
-        #x = self.block4(x)
-        return self.relu(x)
+        block1 = self.block1(x)
+        block2 = self.block2(block1)
+        block3 = self.block3(block2)
+        block4 = self.block4(block3)
+
+        # Out1 = Original Output from Daza et al. (2021)
+        # Out2 = Prediction output to train feature enrichment
+        print("Size")
+        rich_features = torch.cat([self.relu(block2.view(block2.size(0), -1)),
+                                   self.relu(block3.view(block3.size(0), -1)),
+                                   self.relu(block4.view(block4.size(0), -1))], dim=1)
+        out1 = self.relu(block4)
+        out2 = self.final(out1.view(out1.shape[0], -1))
+        return out1, out2, rich_features
 
     def _init_weight(self):
         for m in self.modules():
@@ -129,8 +142,10 @@ class AlignedXception(nn.Module):
 
 
 if __name__ == '__main__':
-    filters = [8, 16, 32, 64, 128, 256, 256]
+    filters = [16, 32, 64, 128, 128, 256]
     model = AlignedXception(BatchNorm=nn.InstanceNorm3d, filters=filters)
     input = torch.rand(1, 1, 128, 128, 128)
-    output = model(input)
-    print(output.size())
+    out1, out2, features = model(input)
+    print(features.size())
+    print(out1.size())
+    print(out2.size())

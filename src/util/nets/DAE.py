@@ -12,19 +12,20 @@ class DenoisingAutoEncoder(nn.Module):
     '''
     def __init__(self):
         super(DenoisingAutoEncoder, self).__init__()
-        n = config.NUM_FEATURES
+        f = config.NUM_FEATURES
+        n = [10,15,20]
         self.encoder = nn.Sequential(
-            # Randomly Dropout 1 Neuron to add 'noise' Default 0.2
+            # Dropout Layer == Input Noise
             nn.Dropout(0.2),
-            nn.Linear(n, n*10),
-            nn.Linear(n*10, n*15),
-            nn.Linear(n*15, n*20),
+            nn.Linear(f, f*n[0]),
+            nn.Linear(f*n[0], f*n[1]),
+            nn.Linear(f*n[1], f*n[2]),
         )
 
         self.decoder = nn.Sequential(
-            nn.Linear(n*20, n*15),
-            nn.Linear(n*15, n*10),
-            nn.Linear(n*10, n),
+            nn.Linear(f*n[2], f*n[1]),
+            nn.Linear(f*n[1], f*n[0]),
+            nn.Linear(f*n[0], f),
             nn.Sigmoid()
         )
 
