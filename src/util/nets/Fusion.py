@@ -1,13 +1,13 @@
 import torch.nn as nn
 import torch
 import src.config as config
-from .DAE import DenoisingAutoEncoder
-from .AlignedXception import AlignedXception
+from DAE import DenoisingAutoEncoder
+from AlignedXception import AlignedXception
 
 
 class Fusion(nn.Module):
-    def __init__(self, dae_model=config.DATA_DIR+'\\models\\DAE\\checkpoints\\N20\\BEST_DAE.pth',
-                        alx_model=config.DATA_DIR+'\\models\\ALX\\checkpoints\\BEST_DAE'):
+    def __init__(self, dae_model=config.DATA_DIR+'\\models\\Unimodal\\DAE\\checkpoints\\N20\\BEST_DAE.pth',
+                        alx_model=config.DATA_DIR+'\\models\\Unimodal\\ALX\\checkpoints\\BEST 3F.pth'):
         super(Fusion, self).__init__()
 
         # Images
@@ -29,7 +29,7 @@ class Fusion(nn.Module):
         #self.fc_d = nn.Linear(74, 512) # == Simple Feature
 
         # Combination
-        self._fc0 = nn.Linear(75776 + 1480, filters[-1]) #1480 where N = 20
+        self._fc0 = nn.Linear(10240 + 1480, filters[-1]) #1480 where N = 20
         self._dropout = nn.Dropout(0.2)
         self._fc = nn.Linear(filters[-1], 2)
         self.relu = nn.ReLU(inplace=True)
@@ -46,16 +46,17 @@ class Fusion(nn.Module):
         # y = torch.squeeze(y, dim=1)
 
         # ----------- ALX Feature Fusion ---------- #
-        x = self.relu()
-
+        _, _, x = self.ALX(x)
+        x1 = x[0]
+        x2 = x[1]
+        x3 = x[2]
         # ----------- DAE Feature Fusion ---------- #
         y = self.relu(self.DAE(y)[0])
         y = y.view(y.shape[0], -1)
 
 
-
         # Combination via concatenation
-        x = self.relu(self._fc0(torch.cat([x, y], dim=1)))
+        x = self.relu(self._fc0(torch.cat((x2, x3, y), dim=1)))
         x = self._dropout(x)
         x = self._fc(x)
         return x

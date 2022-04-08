@@ -124,7 +124,7 @@ def train_model(epoch, model, optim, criterion, train_loader, writer):
     print_stats = 5  # Every 5 Percent Print Stats
 
     scaler = torch.cuda.amp.GradScaler()
-
+    torch.autograd.set_detect_anomaly(True)
     for batch_idx, sample in enumerate(train_loader):
         data = sample['scan'].to(device=config.DEVICE).float()
         targets = sample['label'].to(device=config.DEVICE).float()
@@ -183,7 +183,7 @@ def test(model, loader, criterion, writer, epoch=0):
         correct += (pred * target).sum()
 
     print(f"Epoch {epoch}")
-    print('Val:\n  Loss: {:.6f} ---'.format(epoch_loss.avg))
+    print('Val:\n     Loss: {:.6f} ---'.format(epoch_loss.avg))
 
     # Metrics
     roc = roc_auc_score(labels, scores)
@@ -192,7 +192,7 @@ def test(model, loader, criterion, writer, epoch=0):
     f1 = f1_score(labels, predictions)
     accuracy = sum(1 for x, y in zip(labels, predictions) if x == y) / len(labels)
 
-    print(f"ROC_AUC: {roc} \n     AP: {ap} \n     F1: {f1}\n ACCURACY: {accuracy}")
+    print(f"  ROC_AUC:   {roc} \n     AP: {ap} \n       F1: {f1}\n ACCURACY: {accuracy}")
     print("___________________________")
 
     plt.plot(fpr, tpr)

@@ -122,10 +122,14 @@ class AlignedXception(nn.Module):
 
         # Out1 = Original Output from Daza et al. (2021)
         # Out2 = Prediction output to train feature enrichment
-        print("Size")
-        rich_features = torch.cat([self.relu(block2.view(block2.size(0), -1)),
-                                   self.relu(block3.view(block3.size(0), -1)),
-                                   self.relu(block4.view(block4.size(0), -1))], dim=1)
+        # Rich_Features = Concatenation of Features for new model
+
+        f1 = self.relu(block2.clone().view(block2.size(0), -1))
+        f2 = self.relu(block3.clone().view(block3.size(0), -1))
+        f3 = self.relu(block4.clone().view(block4.size(0), -1))
+        print(f3.size())
+        print(f2.size())
+        rich_features = [f1, f2, f3]
         out1 = self.relu(block4)
         out2 = self.final(out1.view(out1.shape[0], -1))
         return out1, out2, rich_features
