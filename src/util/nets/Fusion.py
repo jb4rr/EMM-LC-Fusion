@@ -16,17 +16,17 @@ class Fusion(nn.Module):
         self.backbone = AlignedXception(BatchNorm, filters)
 
         # Load Pretrained Models
-        DAE = DenoisingAutoEncoder()
-        DAE.load_state_dict(torch.load(dae_model)['state_dict'])
-        DAE.eval()
+        self.DAE = DenoisingAutoEncoder()
+        self.DAE.load_state_dict(torch.load(dae_model)['state_dict'])
+        for dae_param in self.DAE.parameters():
+            dae_param.requires_grad = False
+        self.DAE.eval()
 
-        ALX = AlignedXception(BatchNorm, filters)
-        ALX.load_state_dict(torch.load(alx_model)['state_dict'])
-        ALX.eval()
-
-        self.DAE = DAE  # == Feature Extraction
-        self.ALX = ALX
-        #self.fc_d = nn.Linear(74, 512) # == Simple Feature
+        self.ALX = AlignedXception(BatchNorm, filters)
+        self.ALX.load_state_dict(torch.load(alx_model)['state_dict'])
+        for alx_param in self.ALX.parameters():
+            alx_param.requires_grad = False
+        self.ALX.eval()
 
         # Combination
         self._fc0 = nn.Linear(10240 + 1480, filters[-1]) #1480 where N = 20
@@ -36,20 +36,10 @@ class Fusion(nn.Module):
 
     def forward(self, x, y):
         # Images
-        # ---------For Simple Fusion -----------#
-        # x = self.backbone(x)
-        # x = x.view(x.shape[0], -1)
-
-        # Descriptor index [0] for encoded output, index [1] for decoded output
-        # --------- For Simple Fusion ----------#
-        # y = self.relu(self.fc_d(y))
-        # y = torch.squeeze(y, dim=1)
-
         # ----------- ALX Feature Fusion ---------- #
-        _, _, x = self.ALX(x)
-        x1 = x[0]
-        x2 = x[1]
-        x3 = x[2]
+        _, x = self.ALX(x)
+        x1, x2, x3, x4 = x
+
         # ----------- DAE Feature Fusion ---------- #
         y = self.relu(self.DAE(y)[0])
         y = y.view(y.shape[0], -1)

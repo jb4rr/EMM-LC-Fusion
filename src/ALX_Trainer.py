@@ -132,7 +132,7 @@ def train_model(epoch, model, optim, criterion, train_loader, writer):
         optim.zero_grad()
         # Forward Pass
         with torch.cuda.amp.autocast():
-            _, scores, _ = model(data)
+            scores, _ = model(data)
             loss = criterion(scores, targets)
 
         # Backward Pass
@@ -170,7 +170,7 @@ def test(model, loader, criterion, writer, epoch=0):
         labels.extend(sample['label'].tolist())
 
         with torch.no_grad():
-            _, out, _ = model(data)
+            out, _ = model(data)
         loss = criterion(out, torch.stack([1 - target, target], dim=1))
         epoch_loss.update(loss.item())
 
