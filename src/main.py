@@ -35,10 +35,23 @@ def main(load_path=None, train=True):
     torch.backends.cudnn.benchmark = True
 
     # Change CSV for Training
-    train_data = EMM_LC_Fusion_Loader(scan_csv='Data\\Preprocessed-LUCAS-CSV\\train_file.csv',
-                                      desc_csv='Data\\Preprocessed-LUCAS-CSV\\train_descriptor.csv')
-    test_data = EMM_LC_Fusion_Loader(scan_csv='Data\\Preprocessed-LUCAS-CSV\\test_file.csv',
-                                     desc_csv='Data\\Preprocessed-LUCAS-CSV\\test_descriptor.csv')
+    train_data = EMM_LC_Fusion_Loader(scan_csv='Data\\Preprocessed-LIAO-L-Thresh-CSV\\train_file.csv',
+                                      desc_csv='Data\\Preprocessed-LIAO-L-Thresh-CSV\\train_descriptor.csv',
+                                      transform=transforms.Compose([RandomFlip(2, flip_probability=0.5),
+                                                                    RandomAffine(degrees=(-20, 20, 0, 0, 0, 0),
+                                                                                 default_pad_value=170),
+                                                                    Resize((128, 128, 128))]))
+    test_data = EMM_LC_Fusion_Loader(scan_csv='Data\\Preprocessed-LIAO-L-Thresh-CSV\\test_file.csv',
+                                     desc_csv='Data\\Preprocessed-LIAO-L-Thresh-CSV\\test_descriptor.csv',
+                                     transform=transforms.Compose([RandomFlip(2, flip_probability=0.5),
+                                                                   RandomAffine(degrees=(-20, 20, 0, 0, 0, 0),
+                                                                                default_pad_value=170),
+                                                                   Resize((128, 128, 128))]))
+
+    #train_data = EMM_LC_Fusion_Loader(scan_csv='Data\\Preprocessed-LUCAS-CSV\\train_file.csv',
+    #                                  desc_csv='Data\\Preprocessed-LUCAS-CSV\\train_descriptor.csv')
+    #test_data = EMM_LC_Fusion_Loader(scan_csv='Data\\Preprocessed-LUCAS-CSV\\test_file.csv',
+    #                                 desc_csv='Data\\Preprocessed-LUCAS-CSV\\test_descriptor.csv')
 
     print("Loaded Dataset")
 
@@ -51,8 +64,6 @@ def main(load_path=None, train=True):
     train_loader = DataLoader(train_data, sampler=w, batch_size=config.BATCH_SIZE, num_workers=config.NUM_WORKERS)
     test_loader = DataLoader(test_data, batch_size=config.BATCH_SIZE, num_workers=config.NUM_WORKERS)
 
-    for batch_idx, sample in enumerate(train_loader):
-        print(batch_idx)
 
     model = Fusion()
     model = model.to(device=config.DEVICE)
@@ -67,16 +78,17 @@ def main(load_path=None, train=True):
     print("Training")
     if train:
         torch.cuda.empty_cache()
+        writer = SummaryWriter(config.DATA_DIR + '/Data/models/Multimodal/Simple-Fusion/logs/runs')
         if load_path:
             checkpoint = torch.load(load_path)
-            model.load_state_dict(checkpoint['model_state_dict'])
-            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            model.load_state_dict(checkpoint['state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer'])
             epoch = checkpoint['epoch']
             best_f1 = checkpoint['f1']
 
-            model.load_state_dict(checkpoint['model_state_dict'])
+            test(model, test_loader, criterion, writer, epoch=epoch, log=False)
+            return
 
-        writer = SummaryWriter(config.DATA_DIR + '/Data/models/Baseline/logs/runs')
         print(config.DATA_DIR + '/Data/models/Baseline/logs/runs')
         for epoch in range(epoch, config.NUM_EPOCHS):
             lr = get_lr(optimizer)
@@ -110,9 +122,9 @@ def main(load_path=None, train=True):
             if is_best:
                 # Only Save after 10 epochs
                 if epoch > 10:
-                    save_model(state, model_path=config.DATA_DIR + "/Data/models/Baseline/checkpoints/Best.pth")
+                    save_model(state, model_path=config.DATA_DIR + "/Data/models/Multimodal/Simple-Fusion/checkpoints/Best.pth")
             else:
-                save_model(state, model_path=config.DATA_DIR + "/Data/models/Baseline/checkpoints/Last.pth")
+                save_model(state, model_path=config.DATA_DIR + "/Data/models/Multimodal/Simple-Fusion/checkpoints/Last.pth")
 
             if lr <= (config.LR / (10 ** 4)):
                 print('Stopping training: learning rate is too small')
@@ -160,7 +172,7 @@ def train_model(epoch, model, optim, criterion, train_loader, writer):
     return epoch_loss.avg
 
 
-def test(model, loader, criterion, writer, epoch=0):
+def test(model, loader, criterion, writer, epoch=0, log=True):
     model.eval()
     epoch_loss = AverageMeter()
     count, correct = 0, 0
@@ -198,17 +210,18 @@ def test(model, loader, criterion, writer, epoch=0):
     print(f"ROC_AUC: {roc} \n     AP: {ap} \n     F1: {f1}\n ACCURACY: {accuracy}")
     print("___________________________")
 
-    plt.plot(fpr, tpr)
-    plt.ylabel('True Positive Rate')
-    plt.xlabel('False Positive Rate')
-    plt.savefig(config.DATA_DIR+f'\\Data\\models\\Baseline\\checkpoints\\AUC-ROC Curve\\Epoch-{epoch}-Curve.png')
-    plt.clf()
 
-    writer.add_scalar('ROC_AUC', roc, epoch)
-    writer.add_scalar('F1', f1, epoch)
-    writer.add_scalar('Average Precision', ap, epoch)
-    writer.add_scalar('Validation Loss', epoch_loss.avg, epoch)
-
+    if log:
+        plt.plot(fpr, tpr)
+        plt.ylabel('True Positive Rate')
+        plt.xlabel('False Positive Rate')
+        plt.savefig(config.DATA_DIR + f'\\Data\\models\\Multimodal\\Simple-Fusion\\checkpoints\\AUC-ROC Curve\\Epoch-{epoch}-Curve.png')
+        plt.clf()
+        writer.add_scalar('ROC_AUC', roc, epoch)
+        writer.add_scalar('F1', f1, epoch)
+        writer.add_scalar('Average Precision', ap, epoch)
+        writer.add_scalar('Validation Loss', epoch_loss.avg, epoch)
+        writer.flush()
     flag = True
     if count == 0 or count == len(loader.dataset):
         flag = False

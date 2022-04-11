@@ -24,14 +24,13 @@ class Fusion(nn.Module):
     def forward(self, x, y):
         # Images
         x = self.backbone(x)
-        #print(x.size())
         x = x.view(x.shape[0], -1)
+
         # Descriptor
         y = self.relu(self.fc_d(y))
 
         # Combination
-        #print(x.size())
-        #print(y.size())
+
         x = self.relu(self._fc0(torch.cat([x, y], dim=1)))
         x = self._dropout(x)
         x = self._fc(x)
