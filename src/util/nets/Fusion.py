@@ -1,8 +1,8 @@
 import torch.nn as nn
 import torch
 import src.config as config
-from DAE import DenoisingAutoEncoder
-from AlignedXception import AlignedXception
+from .DAE import DenoisingAutoEncoder
+from .AlignedXception import AlignedXception
 
 
 class Fusion(nn.Module):

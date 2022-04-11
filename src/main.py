@@ -67,16 +67,21 @@ def main(load_path=None, train=True):
     print("Training")
     if train:
         torch.cuda.empty_cache()
+        writer = SummaryWriter(config.DATA_DIR + '/models/Multimodal/EMM-LC-Fusion/logs/runs')
         if load_path:
             checkpoint = torch.load(load_path)
             model.load_state_dict(checkpoint['model_state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             epoch = checkpoint['epoch']
             best_f1 = checkpoint['f1']
-
             model.load_state_dict(checkpoint['model_state_dict'])
 
-        writer = SummaryWriter(config.DATA_DIR + '/models/DAE-Fusion/N20/logs/runs')
+            test(model, test_loader, criterion, writer, epoch=epoch, log=False)
+
+            return
+
+
+
         for epoch in range(epoch, config.NUM_EPOCHS):
             lr = get_lr(optimizer)
             print(f"Epoch {epoch} with LR == {lr}")
@@ -109,9 +114,9 @@ def main(load_path=None, train=True):
             if is_best:
                 # Only Save after 10 epochs
                 if epoch > 10:
-                    save_model(state, model_path=config.DATA_DIR + "/models/DAE-Fusion/N20/checkpoints/Best.pth")
+                    save_model(state, model_path=config.DATA_DIR + "/models/Multimodal/EMM-LC-Fusion/checkpoints/Best.pth")
             else:
-                save_model(state, model_path=config.DATA_DIR + "/models/DAE-Fusion/N20/checkpoints/Last.pth")
+                save_model(state, model_path=config.DATA_DIR + "/models/Multimodal/EMM-LC-Fusion/checkpoints/Last.pth")
 
             if lr <= (config.LR / (10 ** 4)):
                 print('Stopping training: learning rate is too small')
@@ -154,12 +159,12 @@ def train_model(epoch, model, optim, criterion, train_loader, writer):
                 time.strftime("%H:%M:%S"), (batch_idx + 1),
                 (len(train_loader)), 100. * (batch_idx + 1) / (len(train_loader)),
                 loss.item()))
-
+            writer.flush()
     print('--- Train: \tLoss: {:.6f} ---'.format(epoch_loss.avg))
     return epoch_loss.avg
 
 
-def test(model, loader, criterion, writer, epoch=0):
+def test(model, loader, criterion, writer, epoch=0, log=True):
     model.eval()
     epoch_loss = AverageMeter()
     count, correct = 0, 0
@@ -200,14 +205,14 @@ def test(model, loader, criterion, writer, epoch=0):
     plt.plot(fpr, tpr)
     plt.ylabel('True Positive Rate')
     plt.xlabel('False Positive Rate')
-    plt.savefig(config.DATA_DIR+f'\\models\\DAE-Fusion\\N20\\checkpoints\\AUC-ROC Curve\\Epoch-{epoch}-Curve.png')
+    plt.savefig(config.DATA_DIR+f'\\models\\Multimodal\\EMM-LC-Fusion\\checkpoints\\AUC-ROC Curve\\Epoch-{epoch}-Curve.png')
     plt.clf()
-
-    writer.add_scalar('ROC_AUC', roc, epoch)
-    writer.add_scalar('F1', f1, epoch)
-    writer.add_scalar('Average Precision', ap, epoch)
-    writer.add_scalar('Validation Loss', epoch_loss.avg, epoch)
-
+    if log:
+        writer.add_scalar('ROC_AUC', roc, epoch)
+        writer.add_scalar('F1', f1, epoch)
+        writer.add_scalar('Average Precision', ap, epoch)
+        writer.add_scalar('Validation Loss', epoch_loss.avg, epoch)
+        writer.flush()
     flag = True
     if count == 0 or count == len(loader.dataset):
         flag = False
