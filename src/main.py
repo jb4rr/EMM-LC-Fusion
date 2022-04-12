@@ -77,7 +77,7 @@ def main(load_path=None, train=True):
     print("Training")
     if train:
         torch.cuda.empty_cache()
-        writer = SummaryWriter(config.DATA_DIR + '/Data/models/Multimodal/Simple-Fusion/logs/runs')
+        writer = SummaryWriter(config.DATA_DIR + '/Data/models/Multimodal/Baseline/logs/runs')
         if load_path:
             checkpoint = torch.load(load_path)
             model.load_state_dict(checkpoint['state_dict'])
@@ -121,9 +121,9 @@ def main(load_path=None, train=True):
             if is_best:
                 # Only Save after 10 epochs
                 if epoch > 10:
-                    save_model(state, model_path=config.DATA_DIR + "/Data/models/Multimodal/Simple-Fusion/checkpoints/Best.pth")
+                    save_model(state, model_path=config.DATA_DIR + "/Data/models/Multimodal/Baseline/checkpoints/Best.pth")
             else:
-                save_model(state, model_path=config.DATA_DIR + "/Data/models/Multimodal/Simple-Fusion/checkpoints/Last.pth")
+                save_model(state, model_path=config.DATA_DIR + "/Data/models/Multimodal/Baseline/checkpoints/Last.pth")
 
             if lr <= (config.LR / (10 ** 4)):
                 print('Stopping training: learning rate is too small')
@@ -214,7 +214,7 @@ def test(model, loader, criterion, writer, epoch=0, log=True):
         plt.plot(fpr, tpr)
         plt.ylabel('True Positive Rate')
         plt.xlabel('False Positive Rate')
-        plt.savefig(config.DATA_DIR + f'\\Data\\models\\Multimodal\\Simple-Fusion\\checkpoints\\AUC-ROC Curve\\Epoch-{epoch}-Curve.png')
+        plt.savefig(config.DATA_DIR + f'\\Data\\models\\Multimodal\\Baseline\\checkpoints\\AUC-ROC Curve\\Epoch-{epoch}-Curve.png')
         plt.clf()
         writer.add_scalar('ROC_AUC', roc, epoch)
         writer.add_scalar('F1', f1, epoch)
