@@ -18,7 +18,7 @@ from torchvision import transforms
 from torch.utils.data import DataLoader, sampler
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import roc_auc_score, average_precision_score, f1_score, roc_curve
-from util.dataloader import EMM_LC_Fusion_Loader
+from util.dataloader import EMM_LC_Fusion_Loader_Liao, EMM_LC_Fusion_Loader_Lucas
 
 from util.nets.Fusion import Fusion
 from util.utils import AverageMeter, save_model, get_lr
@@ -35,23 +35,23 @@ def main(load_path=None, train=True):
     torch.backends.cudnn.benchmark = True
 
     # Change CSV for Training
-    train_data = EMM_LC_Fusion_Loader(scan_csv='Data\\Preprocessed-LIAO-L-Thresh-CSV\\train_file.csv',
-                                      desc_csv='Data\\Preprocessed-LIAO-L-Thresh-CSV\\train_descriptor.csv',
-                                      transform=transforms.Compose([RandomFlip(2, flip_probability=0.5),
-                                                                    RandomAffine(degrees=(-20, 20, 0, 0, 0, 0),
-                                                                                 default_pad_value=170),
-                                                                    Resize((128, 128, 128))]))
-    test_data = EMM_LC_Fusion_Loader(scan_csv='Data\\Preprocessed-LIAO-L-Thresh-CSV\\test_file.csv',
-                                     desc_csv='Data\\Preprocessed-LIAO-L-Thresh-CSV\\test_descriptor.csv',
-                                     transform=transforms.Compose([RandomFlip(2, flip_probability=0.5),
-                                                                   RandomAffine(degrees=(-20, 20, 0, 0, 0, 0),
-                                                                                default_pad_value=170),
-                                                                   Resize((128, 128, 128))]))
+    #train_data = EMM_LC_Fusion_Loader_Liao(scan_csv='Data\\Preprocessed-LIAO-L-Thresh-CSV\\train_file.csv',
+    #                                  desc_csv='Data\\Preprocessed-LIAO-L-Thresh-CSV\\train_descriptor.csv',
+    #                                  transform=transforms.Compose([RandomFlip(2, flip_probability=0.5),
+    #                                                                RandomAffine(degrees=(-20, 20, 0, 0, 0, 0),
+    #                                                                             default_pad_value=170),
+    #                                                                Resize((128, 128, 128))]))
+    #test_data = EMM_LC_Fusion_Loader_Liao(scan_csv='Data\\Preprocessed-LIAO-L-Thresh-CSV\\test_file.csv',
+    #                                 desc_csv='Data\\Preprocessed-LIAO-L-Thresh-CSV\\test_descriptor.csv',
+    #                                 transform=transforms.Compose([RandomFlip(2, flip_probability=0.5),
+    #                                                               RandomAffine(degrees=(-20, 20, 0, 0, 0, 0),
+    #                                                                            default_pad_value=170),
+    #                                                               Resize((128, 128, 128))]))
 
-    #train_data = EMM_LC_Fusion_Loader(scan_csv='Data\\Preprocessed-LUCAS-CSV\\train_file.csv',
-    #                                  desc_csv='Data\\Preprocessed-LUCAS-CSV\\train_descriptor.csv')
-    #test_data = EMM_LC_Fusion_Loader(scan_csv='Data\\Preprocessed-LUCAS-CSV\\test_file.csv',
-    #                                 desc_csv='Data\\Preprocessed-LUCAS-CSV\\test_descriptor.csv')
+    train_data = EMM_LC_Fusion_Loader_Lucas(scan_csv='Data\\Preprocessed-LUCAS-CSV\\train_file.csv',
+                                      desc_csv='Data\\Preprocessed-LUCAS-CSV\\train_descriptor.csv')
+    test_data = EMM_LC_Fusion_Loader_Lucas(scan_csv='Data\\Preprocessed-LUCAS-CSV\\test_file.csv',
+                                     desc_csv='Data\\Preprocessed-LUCAS-CSV\\test_descriptor.csv')
 
     print("Loaded Dataset")
 
@@ -63,7 +63,6 @@ def main(load_path=None, train=True):
 
     train_loader = DataLoader(train_data, sampler=w, batch_size=config.BATCH_SIZE, num_workers=config.NUM_WORKERS)
     test_loader = DataLoader(test_data, batch_size=config.BATCH_SIZE, num_workers=config.NUM_WORKERS)
-
 
     model = Fusion()
     model = model.to(device=config.DEVICE)

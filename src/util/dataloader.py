@@ -11,9 +11,8 @@ import torch
 path.append('util/')
 
 
-
-class EMM_LC_Fusion_Loader(Dataset):
-    def __init__(self, scan_csv=None, desc_csv=None, transform=None):
+class EMM_LC_Fusion_Loader_Lucas(Dataset):
+    def __init__(self, scan_csv=None, desc_csv=None):
         self.root_dir = config.DATA_DIR
         self.image_size = np.asarray((128,128,128))
 
@@ -36,10 +35,8 @@ class EMM_LC_Fusion_Loader(Dataset):
         descriptor = descriptor[1:12] + descriptor[13:-1]
         descriptor = np.array(descriptor, dtype=np.float32)
         if os.path.exists(self.root_dir + '/Data/Preprocessed-LUCAS/' + str(patient) + '.npy'):
-            #print(f"loaded: {patient}")
             image = np.load(self.root_dir + '/Data/Preprocessed-LUCAS/' + str(patient) + '.npy')
         else:
-            #print(f"processing: {patient}")
             image = load_image('SCANS/' + str(patient) + '.nii.gz', self.root_dir)
 
             if any(np.asarray(image.shape) <= self.image_size):
@@ -78,6 +75,78 @@ class EMM_LC_Fusion_Loader(Dataset):
             weight[idx] = weight_per_class[self.labels[val][self.task]]
         return weight
 
+
+class EMM_LC_Fusion_Loader_Liao(Dataset):
+    def __init__(self, scan_csv=None, desc_csv=None, transform=None):
+        # Set Root Data Directory
+        self.root = config.DATA_DIR
+        self.desc_labels = None
+        self.scan_labels = None
+        self.scan = None
+        self.task = -2  # Used to Index Column -2 = Cancer
+        self.transform = transform
+
+        if desc_csv is not None:
+            # Format and Remove Redundant Columns From DataFrame
+            self.desc_labels = pd.read_csv(os.path.join(self.root, desc_csv))
+            self.desc_labels = self.desc_labels.drop(['Benign_cons', 'Malignant_gra', 'x<3mm_mass'], axis=1)
+            self.desc_labels = self.desc_labels.set_index('patient_id').T.to_dict('list')
+
+            # Replace with value 1 if greater than 1 (Lack of Clarity In Dataset as to what these values mean)
+            for key, value in self.desc_labels.items():
+                self.desc_labels[key] = [1 if ele > 1 else ele for ele in self.desc_labels[key]]
+
+            self.idx = list(self.desc_labels.keys())
+
+        if scan_csv is not None:
+            self.scan_labels = pd.read_csv(os.path.join(self.root, scan_csv))
+            self.scan_labels = self.scan_labels.set_index('patient_id').T.to_dict('list')
+            self.idx = list(self.scan_labels.keys())
+            self.weights = self.weights_balanced()
+
+    def __len__(self):
+        # Return Length of Labels Regardless of what Loader is Loading
+        labels = next(l for l in [self.scan_labels, self.desc_labels] if l)
+        return len(labels)
+
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        patient = self.idx[idx]
+        if self.desc_labels is not None:
+            desc_labels = self.desc_labels[patient][1:-1]
+            desc_labels = torch.unsqueeze(torch.tensor(desc_labels), 0)
+        else:
+            desc_labels = torch.empty(1)
+
+        if self.scan_labels is not None:
+            scan_labels = self.scan_labels[patient][self.task]
+            scan_labels = float(scan_labels)
+
+            preprocessed_img_dir = os.path.join(self.root, "Preprocessed-LIAO-L-Thresh", str(patient) + ".npy")
+            scan = np.load(preprocessed_img_dir)
+            scan = torch.unsqueeze(torch.tensor(scan), 0)
+            if self.transform:
+                scan = self.transform(scan)
+        else:
+            scan = torch.empty(1)
+            scan_labels = torch.empty(1)
+
+        return {'scan': scan, 'label': scan_labels, 'descriptor': desc_labels, 'id': patient}
+
+    def weights_balanced(self):
+        count = [0] * 2
+        for item in self.idx:
+            count[self.scan_labels[item][self.task]] += 1
+        weight_per_class = [0.] * 2
+        N = float(sum(count))
+        for i in range(2):
+            weight_per_class[i] = N / float(count[i])
+        weight = [0] * len(self.idx)
+        for idx, val in enumerate(self.idx):
+            weight[idx] = weight_per_class[self.scan_labels[val][self.task]]
+        return weight
 
 def load_image(patient, root_dir):
     im = nib.load(os.path.join(root_dir, patient))
