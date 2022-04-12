@@ -1,12 +1,12 @@
 import torch.nn as nn
 import torch
 import src.config as config
-from DAE import DenoisingAutoEncoder
-from AlignedXception import AlignedXception
+from .DAE import DenoisingAutoEncoder
+from .AlignedXception import AlignedXception
 
 
 class Fusion(nn.Module):
-    def __init__(self, dae_model=config.DATA_DIR+'\\models\\Unimodal\\DAE\\checkpoints\\N20\\BEST_DAE.pth'):
+    def __init__(self, dae_model=config.DATA_DIR+f'\\models\\Unimodal\\DAE\\checkpoints\\{config.DAE_NUM}\\BEST_DAE.pth'):
         super(Fusion, self).__init__()
 
         # Images
@@ -17,17 +17,17 @@ class Fusion(nn.Module):
         # Load Pretrained Models
         self.DAE = DenoisingAutoEncoder()
         self.DAE.load_state_dict(torch.load(dae_model)['state_dict'])
-        for param in self.DAE.parameters():
-            param.requires_grad = False  # Freeze Model Weights
-        self.DAE.eval()
+
+        self.DAE.eval()  # Disable Dropout
 
         # Combination
-        self._fc0 = nn.Linear(filters[-1] * 2 * 2 * 2 + 1480, filters[-1]) #1480 where N = 20
+        self._fc0 = nn.Linear(filters[-1] * 2 * 2 * 2 + 1480, filters[-1])  # 1480 where N = 20
         self._dropout = nn.Dropout(0.2)
         self._fc = nn.Linear(filters[-1], 2)
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x, y):
+
         # Images
         # ---------For Simple Fusion -----------#
         x = self.backbone(x)

@@ -10,7 +10,7 @@ import time
 import torch.nn.functional as F
 import torch.backends.cudnn as cudnn
 import numpy as np
-from torch.optim import Adam, lr_scheduler
+from torch.optim import Adam, lr_scheduler, SGD
 from torchio.transforms import Resize, RandomFlip, RandomAffine
 from torchvision import transforms
 from torch.utils.data import DataLoader, sampler
@@ -59,6 +59,7 @@ def main(load_path=None, train=True):
     model = model.float()
 
     criterion = nn.BCEWithLogitsLoss()
+    # Only Update weights for layers where required_grad is true
     optimizer = Adam(model.parameters(), lr=config.LR, weight_decay=1e-5)
     annealing = lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, verbose=True)
     epoch = 0
@@ -67,20 +68,17 @@ def main(load_path=None, train=True):
     print("Training")
     if train:
         torch.cuda.empty_cache()
-        writer = SummaryWriter(config.DATA_DIR + '/models/Multimodal/EMM-LC-Fusion/logs/runs')
+        writer = SummaryWriter(config.DATA_DIR + f'/models/Multimodal/CDE-Enrich/{config.DAE_NUM}/logs/runs')
         if load_path:
             checkpoint = torch.load(load_path)
             model.load_state_dict(checkpoint['model_state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             epoch = checkpoint['epoch']
             best_f1 = checkpoint['f1']
-            model.load_state_dict(checkpoint['model_state_dict'])
 
             test(model, test_loader, criterion, writer, epoch=epoch, log=False)
 
             return
-
-
 
         for epoch in range(epoch, config.NUM_EPOCHS):
             lr = get_lr(optimizer)
@@ -114,9 +112,9 @@ def main(load_path=None, train=True):
             if is_best:
                 # Only Save after 10 epochs
                 if epoch > 10:
-                    save_model(state, model_path=config.DATA_DIR + "/models/Multimodal/EMM-LC-Fusion/checkpoints/Best.pth")
+                    save_model(state, model_path=config.DATA_DIR + f"/models/Multimodal/CDE-Enrich/{config.DAE_NUM}/checkpoints/Best.pth")
             else:
-                save_model(state, model_path=config.DATA_DIR + "/models/Multimodal/EMM-LC-Fusion/checkpoints/Last.pth")
+                save_model(state, model_path=config.DATA_DIR + f"/models/Multimodal/CDE-Enrich/{config.DAE_NUM}/checkpoints/Last.pth")
 
             if lr <= (config.LR / (10 ** 4)):
                 print('Stopping training: learning rate is too small')
@@ -152,7 +150,7 @@ def train_model(epoch, model, optim, criterion, train_loader, writer):
 
         if batch_idx % print_stats == 0:
             writer.add_scalar('training loss',
-                               epoch_loss.avg,
+                              loss.item(),
                               epoch * len(train_loader) + batch_idx)
             text = '{} -- [{}/{} ({:.0f}%)]\tLoss: {:.6f}'
             print(text.format(
@@ -205,7 +203,7 @@ def test(model, loader, criterion, writer, epoch=0, log=True):
     plt.plot(fpr, tpr)
     plt.ylabel('True Positive Rate')
     plt.xlabel('False Positive Rate')
-    plt.savefig(config.DATA_DIR+f'\\models\\Multimodal\\EMM-LC-Fusion\\checkpoints\\AUC-ROC Curve\\Epoch-{epoch}-Curve.png')
+    plt.savefig(config.DATA_DIR+f'\\models\\Multimodal\\CDE-Enrich\\{config.DAE_NUM}\\checkpoints\\AUC-ROC Curve\\Epoch-{epoch}-Curve.png')
     plt.clf()
     if log:
         writer.add_scalar('ROC_AUC', roc, epoch)

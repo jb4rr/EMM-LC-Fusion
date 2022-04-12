@@ -18,3 +18,4 @@ LR = 0.001
 NUM_FEATURES = 74
 
 
+DAE_NUM = "N20"

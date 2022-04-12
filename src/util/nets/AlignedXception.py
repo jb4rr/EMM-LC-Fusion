@@ -115,19 +115,13 @@ class AlignedXception(nn.Module):
         x = self.relu(x)
 
         x = self.block0(x)
-        block1 = self.block1(x)
-        block2 = self.block2(block1)
-        block3 = self.block3(block2)
-        block4 = self.block4(block3)
-        out1 = self.relu(block4)
-        # Out1 = Original Output from Daza et al. (2021)
-        # Out2 = Prediction output to train feature enrichment
-        # Rich_Features = Concatenation of Features for new model
+        x = self.block1(x)
+        x = self.block2(x)
+        x = self.block3(x)
+        x = self.block4(x)
 
-        rich_features = [block1, block2, block3, block4]
-        out2 = self.final(out1.view(out1.shape[0], -1))
+        return self.relu(x)
 
-        return out1, out2, rich_features
 
     def _init_weight(self):
         for m in self.modules():

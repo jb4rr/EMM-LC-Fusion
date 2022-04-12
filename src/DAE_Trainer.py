@@ -37,7 +37,7 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=config.LR)
 
     # Train Model
-    writer = SummaryWriter(config.DATA_DIR+"/models/DAE/checkpoints/N30/")
+    writer = SummaryWriter(config.DATA_DIR+f"/models/Unimodal/DAE/checkpoints/{config.DAE_NUM}/")
     cuda.empty_cache()
     train(model, criterion, optimizer, train_loader, test_loader, writer)
 
@@ -109,9 +109,9 @@ def train(model, criterion, optimizer, loader, test_loader, writer):
             'best_f1': best_f1}
 
         if is_best:
-            save_model(state, model_path=config.DATA_DIR+"/models/DAE/checkpoints/N30/BEST_DAE.pth")
+            save_model(state, model_path=config.DATA_DIR+f"/models/Unimodal/DAE/checkpoints/{config.DAE_NUM}/BEST_DAE.pth")
         else:
-            save_model(state, model_path=config.DATA_DIR+"/models/DAE/checkpoints/N30/LAST_DAE.pth")
+            save_model(state, model_path=config.DATA_DIR+f"/models/Unimodal/DAE/checkpoints/{config.DAE_NUM}/LAST_DAE.pth")
         epoch_loss.reset()
 
 
