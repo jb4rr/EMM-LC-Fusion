@@ -27,9 +27,9 @@ from util.utils import AverageMeter, save_model, get_lr
 def main(load_path=None, train=True):
     print("Running...")
 
-    np.random.seed(12345)
-    torch.manual_seed(12345)
-    torch.cuda.manual_seed_all(12345)
+    np.random.seed(22345)
+    torch.manual_seed(22345)
+    torch.cuda.manual_seed_all(22345)
 
     cudnn.deterministic = True
     torch.backends.cudnn.benchmark = True
@@ -84,7 +84,8 @@ def main(load_path=None, train=True):
             optimizer.load_state_dict(checkpoint['optimizer'])
             epoch = checkpoint['epoch']
             best_f1 = checkpoint['f1']
-
+            print(epoch)
+            print(best_f1)
             test(model, test_loader, criterion, writer, epoch=epoch, log=False)
             return
 
@@ -208,7 +209,6 @@ def test(model, loader, criterion, writer, epoch=0, log=True):
 
     print(f"ROC_AUC: {roc} \n     AP: {ap} \n     F1: {f1}\n ACCURACY: {accuracy}")
     print("___________________________")
-
 
     if log:
         plt.plot(fpr, tpr)
