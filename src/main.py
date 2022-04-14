@@ -13,7 +13,7 @@ import numpy as np
 from torch.optim import Adam, lr_scheduler, SGD
 from torchio.transforms import Resize, RandomFlip, RandomAffine
 from torchvision import transforms
-from torch.utils.data import DataLoader, sampler
+from torch.utils.data import DataLoader, sampler, Subset
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import roc_auc_score, average_precision_score, f1_score, roc_curve
 from util.dataloader import EMM_LC_Fusion_Loader
@@ -46,11 +46,11 @@ def main(load_path=None, train=True):
                                                                                 default_pad_value=170),
                                                                    Resize((128, 128, 128))]))
 
+
     print("Loaded Dataset")
 
     # Over Sampling due to lack of entries with cancer : Limitation -> May Produce Over fitting
     w = sampler.WeightedRandomSampler(train_data.weights, len(train_data.weights), replacement=True)
-
     train_loader = DataLoader(train_data, sampler=w, batch_size=config.BATCH_SIZE, num_workers=config.NUM_WORKERS)
     test_loader = DataLoader(test_data, batch_size=config.BATCH_SIZE, num_workers=config.NUM_WORKERS)
 
@@ -60,8 +60,8 @@ def main(load_path=None, train=True):
 
     criterion = nn.BCEWithLogitsLoss()
     # Only Update weights for layers where required_grad is true
-    optimizer = Adam(model.parameters(), lr=config.LR, weight_decay=1e-5)
-    annealing = lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, verbose=True)
+    optimizer = Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=config.LR)
+    annealing = lr_scheduler.ReduceLROnPlateau(optimizer, patience=100, verbose=True)
     epoch = 0
     best_f1 = 0
 
@@ -110,7 +110,7 @@ def main(load_path=None, train=True):
 
             # Implement is best
             if is_best:
-                # Only Save after 10 epochs
+                # Only Save after 10 epochs so ensure features are learnt
                 if epoch > 10:
                     save_model(state, model_path=config.DATA_DIR + f"/models/Multimodal/CDE-Enrich/{config.DAE_NUM}/checkpoints/Best.pth")
             else:
@@ -198,6 +198,11 @@ def test(model, loader, criterion, writer, epoch=0, log=True):
     accuracy = sum(1 for x, y in zip(labels, predictions) if x == y) / len(labels)
 
     print(f"ROC_AUC: {roc} \n     AP: {ap} \n     F1: {f1}\n ACCURACY: {accuracy}")
+
+    print("___________________________")
+    print(scores[:5])
+    print(predictions[:5])
+    print(labels[:5])
     print("___________________________")
 
     plt.plot(fpr, tpr)

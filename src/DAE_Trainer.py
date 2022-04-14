@@ -37,7 +37,7 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=config.LR)
 
     # Train Model
-    writer = SummaryWriter(config.DATA_DIR+f"/models/Unimodal/DAE/checkpoints/{config.DAE_NUM}/")
+    writer = SummaryWriter(config.DATA_DIR+f"/models/Unimodal/DAE/{config.DAE_NUM}/logs")
     cuda.empty_cache()
     train(model, criterion, optimizer, train_loader, test_loader, writer)
 
@@ -109,9 +109,9 @@ def train(model, criterion, optimizer, loader, test_loader, writer):
             'best_f1': best_f1}
 
         if is_best:
-            save_model(state, model_path=config.DATA_DIR+f"/models/Unimodal/DAE/checkpoints/{config.DAE_NUM}/BEST_DAE.pth")
+            save_model(state, model_path=config.DATA_DIR+f"/models/Unimodal/DAE/{config.DAE_NUM}/checkpoints/BEST_DAE.pth")
         else:
-            save_model(state, model_path=config.DATA_DIR+f"/models/Unimodal/DAE/checkpoints/{config.DAE_NUM}/LAST_DAE.pth")
+            save_model(state, model_path=config.DATA_DIR+f"/models/Unimodal/DAE/{config.DAE_NUM}/checkpoints/LAST_DAE.pth")
         epoch_loss.reset()
 
 
@@ -150,7 +150,7 @@ def visualise_data():
     import matplotlib.pyplot as plt
     import pandas as pd
 
-    df = pd.read_csv(r'D:\University of Gloucestershire\Year 4\Dissertation\train_descriptor.csv')
+    df = pd.read_csv(r'E:\University of Gloucestershire\Year 4\Dissertation\train_descriptor.csv')
     #sn.heatmap(df.corr()[['Cancer']])
     #plt.savefig('./correlation_matrix_all.png')
     # Remove Columns with all Zeros

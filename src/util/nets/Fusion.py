@@ -1,12 +1,12 @@
 import torch.nn as nn
 import torch
 import src.config as config
-from DAE import DenoisingAutoEncoder
-from AlignedXception import AlignedXception
+from .DAE import DenoisingAutoEncoder
+from .AlignedXception import AlignedXception
 
 
 class Fusion(nn.Module):
-    def __init__(self, dae_model=config.DATA_DIR+f'\\models\\Unimodal\\DAE\\checkpoints\\{config.DAE_NUM}\\BEST_DAE.pth'):
+    def __init__(self, dae_model=config.DATA_DIR+f'\\models\\Unimodal\\DAE\\{config.DAE_NUM}\\checkpoints\\LAST_DAE.pth'):
         super(Fusion, self).__init__()
 
         # Images
@@ -20,8 +20,9 @@ class Fusion(nn.Module):
 
         # Combination
         self._fc0 = nn.Linear(filters[-1] * 2 * 2 * 2 + 1480, filters[-1])  # 1480 where N = 20
-        self._dropout = nn.Dropout(0.2)
-        self._fc = nn.Linear(filters[-1], 2)
+
+        self._fc2 = nn.Linear(filters[-1], 2)
+        self.dropout = nn.Dropout(0.2)
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x, y):
@@ -36,8 +37,8 @@ class Fusion(nn.Module):
 
         # Combination via concatenation
         x = self.relu(self._fc0(torch.cat((x, y), dim=1)))
-        x = self._dropout(x)
-        x = self._fc(x)
+        #x = self.dropout(x)
+        x = self._fc2(x)
         return x
 
     def load_DAE_model(self, dae_model):
@@ -45,8 +46,8 @@ class Fusion(nn.Module):
         self.DAE.float()
         self.DAE.load_state_dict(torch.load(dae_model, map_location=torch.device(config.DEVICE))['state_dict'])
         self.DAE.eval()  # Disable Dropout
-        for param in self.DAE.parameters():
-            param.requires_grad = False
+        for name, param in self.DAE.named_parameters():
+            param.requires_grad = False  # Freeze Denoising AutoEncoder
 
 
 if __name__ == '__main__':
