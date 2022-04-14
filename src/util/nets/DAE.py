@@ -18,13 +18,17 @@ class DenoisingAutoEncoder(nn.Module):
             # Dropout Layer == Input Noise
             nn.Dropout(0.2),
             nn.Linear(f, f*n[0]),
+            nn.Relu(),
             nn.Linear(f*n[0], f*n[1]),
+            nn.Relu(),
             nn.Linear(f*n[1], f*n[2]),
         )
 
         self.decoder = nn.Sequential(
             nn.Linear(f*n[2], f*n[1]),
+            nn.Relu(),
             nn.Linear(f*n[1], f*n[0]),
+            nn.Relu(),
             nn.Linear(f*n[0], f),
             nn.Sigmoid()
         )
