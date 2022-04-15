@@ -1,5 +1,5 @@
 from sys import path
-from src import config
+import config
 from torch.utils.data import Dataset
 import os
 import pandas as pd
@@ -9,6 +9,7 @@ import numpy as np
 import torch
 
 path.append('util/')
+
 
 
 class EMM_LC_Fusion_Loader(Dataset):

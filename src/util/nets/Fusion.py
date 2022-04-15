@@ -1,16 +1,18 @@
 import torch.nn as nn
 import torch
-import src.config as config
+import config
+from sys import path
 from .DAE import DenoisingAutoEncoder
 from .AlignedXception import AlignedXception
 
+path.append('util/nets/')
 
 class Fusion(nn.Module):
-    def __init__(self, dae_model=config.DATA_DIR+f'\\models\\Unimodal\\DAE\\{config.DAE_NUM}\\checkpoints\\LAST_DAE.pth'):
+    def __init__(self, dae_model=config.DATA_DIR+f'/models/Unimodal/DAE/{config.DAE_NUM}/checkpoints/LAST_DAE.pth'):
         super(Fusion, self).__init__()
 
         # Images
-        BatchNorm = nn.InstanceNorm3d
+        BatchNorm = nn.BatchNorm3d
         filters = [16, 32, 64, 128, 128, 256]
         self.backbone = AlignedXception(BatchNorm, filters)
 
@@ -37,7 +39,7 @@ class Fusion(nn.Module):
 
         # Combination via concatenation
         x = self.relu(self._fc0(torch.cat((x, y), dim=1)))
-        #x = self.dropout(x)
+        x = self.dropout(x)
         x = self._fc2(x)
         return x
 
@@ -46,8 +48,10 @@ class Fusion(nn.Module):
         self.DAE.float()
         self.DAE.load_state_dict(torch.load(dae_model, map_location=torch.device(config.DEVICE))['state_dict'])
         self.DAE.eval()  # Disable Dropout
+        i = 0
         for name, param in self.DAE.named_parameters():
-            param.requires_grad = False  # Freeze Denoising AutoEncoder
+            if i != 3:
+                param.requires_grad = False  # Freeze Denoising AutoEncoder
 
 
 if __name__ == '__main__':

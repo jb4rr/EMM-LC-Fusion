@@ -25,34 +25,30 @@ from util.utils import AverageMeter, save_model, get_lr
 def main(load_path=None, train=True):
     print("Running...")
 
-    np.random.seed(12345)
-    torch.manual_seed(12345)
-    torch.cuda.manual_seed_all(12345)
+    #np.random.seed(12345)
+    #torch.manual_seed(12345)
+    #torch.cuda.manual_seed_all(12345)
 
-    cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = True
+    #cudnn.deterministic = True
+    #torch.backends.cudnn.benchmark = True
 
     # Change CSV for Training
-    train_data = EMM_LC_Fusion_Loader(scan_csv='Preprocessed-LIAO-L-Thresh-CSV\\train_file.csv',
-                                      desc_csv='Preprocessed-LIAO-L-Thresh-CSV\\train_descriptor.csv',
+    train_data = EMM_LC_Fusion_Loader(scan_csv=r'Preprocessed-LIAO-L-Thresh-CSV/train_file.csv',
+                                      desc_csv=r'Preprocessed-LIAO-L-Thresh-CSV/train_descriptor.csv',
                                       transform=transforms.Compose([RandomFlip(2, flip_probability=0.5),
                                                                     RandomAffine(degrees=(-20, 20, 0, 0, 0, 0),
                                                                                  default_pad_value=170),
                                                                     Resize((128, 128, 128))]))
-    test_data = EMM_LC_Fusion_Loader(scan_csv='Preprocessed-LIAO-L-Thresh-CSV\\test_file.csv',
-                                     desc_csv='Preprocessed-LIAO-L-Thresh-CSV\\test_descriptor.csv',
-                                     transform=transforms.Compose([RandomFlip(2, flip_probability=0.5),
-                                                                   RandomAffine(degrees=(-20, 20, 0, 0, 0, 0),
-                                                                                default_pad_value=170),
-                                                                   Resize((128, 128, 128))]))
-
+    test_data = EMM_LC_Fusion_Loader(scan_csv=r'Preprocessed-LIAO-L-Thresh-CSV/test_file.csv',
+                                     desc_csv=r'Preprocessed-LIAO-L-Thresh-CSV/test_descriptor.csv',
+                                     transform=transforms.Compose([Resize((128, 128, 128))]))
 
     print("Loaded Dataset")
 
     # Over Sampling due to lack of entries with cancer : Limitation -> May Produce Over fitting
     w = sampler.WeightedRandomSampler(train_data.weights, len(train_data.weights), replacement=True)
-    train_loader = DataLoader(train_data, sampler=w, batch_size=config.BATCH_SIZE, num_workers=config.NUM_WORKERS)
-    test_loader = DataLoader(test_data, batch_size=config.BATCH_SIZE, num_workers=config.NUM_WORKERS)
+    train_loader = DataLoader(train_data, sampler=w, batch_size=config.BATCH_SIZE, num_workers=config.NUM_WORKERS,  pin_memory=True)
+    test_loader = DataLoader(test_data, batch_size=config.BATCH_SIZE, num_workers=config.NUM_WORKERS,  pin_memory=True)
 
     model = Fusion()
     model = model.to(device=config.DEVICE)
@@ -60,14 +56,14 @@ def main(load_path=None, train=True):
 
     criterion = nn.BCEWithLogitsLoss()
     # Only Update weights for layers where required_grad is true
-    optimizer = Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=config.LR)
-    annealing = lr_scheduler.ReduceLROnPlateau(optimizer, patience=100, verbose=True)
+    optimizer = Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=config.LR, weight_decay=1e-5)
+    annealing = lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, verbose=True)
     epoch = 0
     best_f1 = 0
 
     print("Training")
     if train:
-        torch.cuda.empty_cache()
+        # torch.cuda.empty_cache()
         writer = SummaryWriter(config.DATA_DIR + f'/models/Multimodal/CDE-Enrich/{config.DAE_NUM}/logs/runs')
         if load_path:
             checkpoint = torch.load(load_path)
@@ -138,7 +134,6 @@ def train_model(epoch, model, optim, criterion, train_loader, writer):
         with torch.cuda.amp.autocast():
             scores = model(data, descriptor)
             loss = criterion(scores, targets)
-
         # Backward Pass
         scaler.scale(loss).backward()  # loss.backward()
 
@@ -158,6 +153,7 @@ def train_model(epoch, model, optim, criterion, train_loader, writer):
                 (len(train_loader)), 100. * (batch_idx + 1) / (len(train_loader)),
                 loss.item()))
             writer.flush()
+
     print('--- Train: \tLoss: {:.6f} ---'.format(epoch_loss.avg))
     return epoch_loss.avg
 
@@ -208,7 +204,7 @@ def test(model, loader, criterion, writer, epoch=0, log=True):
     plt.plot(fpr, tpr)
     plt.ylabel('True Positive Rate')
     plt.xlabel('False Positive Rate')
-    plt.savefig(config.DATA_DIR+f'\\models\\Multimodal\\CDE-Enrich\\{config.DAE_NUM}\\checkpoints\\AUC-ROC Curve\\Epoch-{epoch}-Curve.png')
+    plt.savefig(config.DATA_DIR+f'/models/Multimodal/CDE-Enrich/{config.DAE_NUM}/checkpoints/AUC-ROC Curve/Epoch-{epoch}-Curve.png')
     plt.clf()
     if log:
         writer.add_scalar('ROC_AUC', roc, epoch)
