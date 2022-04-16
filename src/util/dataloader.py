@@ -1,5 +1,5 @@
 from sys import path
-from src import config
+import config
 from torch.utils.data import Dataset
 import os
 import pandas as pd
@@ -132,7 +132,6 @@ class EMM_LC_Fusion_Loader_Liao(Dataset):
         else:
             scan = torch.empty(1)
             scan_labels = torch.empty(1)
-
         return {'scan': scan, 'label': scan_labels, 'descriptor': desc_labels, 'id': patient}
 
     def weights_balanced(self):

@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 from sys import path
-import src.config as config
+import config
 
-path.append('../../util/')
+path.append('util/nets')
 
 
 class DenoisingAutoEncoder(nn.Module):

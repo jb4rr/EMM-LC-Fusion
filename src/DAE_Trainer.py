@@ -18,8 +18,8 @@ from util.utils import AverageMeter, save_model
 
 def main():
     # Define Dataset
-    train_data = EMM_LC_Fusion_Loader(desc_csv='Preprocessed-LIAO-L-Thresh-CSV\\train_descriptor.csv')
-    test_data = EMM_LC_Fusion_Loader(desc_csv='Preprocessed-LIAO-L-Thresh-CSV\\test_descriptor.csv')
+    train_data = EMM_LC_Fusion_Loader(desc_csv='Preprocessed-LIAO-L-Thresh-CSV/train_descriptor.csv')
+    test_data = EMM_LC_Fusion_Loader(desc_csv='Preprocessed-LIAO-L-Thresh-CSV/st_descriptor.csv')
 
     # Define DataLoader
     train_loader = DataLoader(train_data, batch_size=8,

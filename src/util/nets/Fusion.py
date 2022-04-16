@@ -1,19 +1,22 @@
 import torch.nn as nn
 import torch
-import src.config as config
+import config
 from .AlignedXception import AlignedXception
+from sys import path
+
+path.append('util/nets')
 
 
 class Fusion(nn.Module):
     def __init__(self, num_classes=2):
         super(Fusion, self).__init__()
         # Images
-        BatchNorm = nn.InstanceNorm3d
+        BatchNorm = nn.BatchNorm3d
         filters = [16, 32, 64, 128, 128, 256]
         self.backbone = AlignedXception(BatchNorm, filters)
 
         # Descriptor
-        self.fc_d = nn.Linear(76, 512)
+        self.fc_d = nn.Linear(74, 512)
 
         # Combination
         self._fc0 = nn.Linear(filters[-1] * 2 * 2 * 2 + 512, filters[-1])
@@ -25,12 +28,10 @@ class Fusion(nn.Module):
         # Images
         x = self.backbone(x)
         x = x.view(x.shape[0], -1)
-
         # Descriptor
         y = self.relu(self.fc_d(y))
-
+        y = torch.squeeze(y, dim=1)
         # Combination
-
         x = self.relu(self._fc0(torch.cat([x, y], dim=1)))
         x = self._dropout(x)
         x = self._fc(x)

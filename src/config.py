@@ -5,11 +5,11 @@ if torch.cuda.is_available():
 else:
     DEVICE = "cpu"
 
-DATA_DIR = "E:\\University of Gloucestershire\\Year 4\\Dissertation"
-BATCH_SIZE = 2
-NUM_WORKERS = 4
+DATA_DIR = r"/content/gdrive/MyDrive/Colab Notebooks/Project/Data"
+BATCH_SIZE = 32
+NUM_WORKERS = 2
 NUM_EPOCHS = 50
 LR = 0.001
-NUM_FEATURES=76
+NUM_FEATURES = 74
 
 
