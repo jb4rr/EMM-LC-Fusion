@@ -22,9 +22,9 @@ def main():
     test_data = EMM_LC_Fusion_Loader(desc_csv='Preprocessed-LIAO-L-Thresh-CSV/test_descriptor.csv')
 
     # Define DataLoader
-    train_loader = DataLoader(train_data, batch_size=8,
+    train_loader = DataLoader(train_data, batch_size=32,
                               num_workers=config.NUM_WORKERS, shuffle=True)
-    test_loader = DataLoader(test_data, batch_size=8,
+    test_loader = DataLoader(test_data, batch_size=32,
                              num_workers=config.NUM_WORKERS, shuffle=True)
 
     # Define Model
@@ -43,7 +43,7 @@ def main():
 
     # Test Model
     cuda.empty_cache()
-    test(model, criterion, test_loader, writer, epoch=0)
+    test(model, criterion, test_loader, writer, epoch=config.NUM_EPOCHS)
 
 
 def train(model, criterion, optimizer, loader, test_loader, writer):
@@ -109,9 +109,9 @@ def train(model, criterion, optimizer, loader, test_loader, writer):
             'best_f1': best_f1}
 
         if is_best:
-            save_model(state, model_path=config.DATA_DIR+f"/models/Unimodal/DAE/{config.DAE_NUM}/checkpoints/BEST_DAE.pth")
+            save_model(state, model_path=config.DATA_DIR+f"/models/Unimodal/DAE/{config.DAE_NUM}/checkpoints/Best.pth")
         else:
-            save_model(state, model_path=config.DATA_DIR+f"/models/Unimodal/DAE/{config.DAE_NUM}/checkpoints/LAST_DAE.pth")
+            save_model(state, model_path=config.DATA_DIR+f"/models/Unimodal/DAE/{config.DAE_NUM}/checkpoints/Last.pth")
         epoch_loss.reset()
 
 
