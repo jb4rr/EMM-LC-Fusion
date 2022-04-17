@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 from sys import path
-import src.config as config
+import config
 
-path.append('../../util/')
+path.append('util/nets/')
 
 
 class DenoisingAutoEncoder(nn.Module):
@@ -13,22 +13,18 @@ class DenoisingAutoEncoder(nn.Module):
     def __init__(self):
         super(DenoisingAutoEncoder, self).__init__()
         f = config.NUM_FEATURES
-        n = [10,15,20]
+        n = [2,5,10]
         self.encoder = nn.Sequential(
             # Dropout Layer == Input Noise
             nn.Dropout(0.2),
             nn.Linear(f, f*n[0]),
-            nn.Relu(),
             nn.Linear(f*n[0], f*n[1]),
-            nn.Relu(),
             nn.Linear(f*n[1], f*n[2]),
         )
 
         self.decoder = nn.Sequential(
             nn.Linear(f*n[2], f*n[1]),
-            nn.Relu(),
             nn.Linear(f*n[1], f*n[0]),
-            nn.Relu(),
             nn.Linear(f*n[0], f),
             nn.Sigmoid()
         )

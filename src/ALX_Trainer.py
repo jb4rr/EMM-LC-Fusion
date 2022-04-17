@@ -25,26 +25,23 @@ from util.utils import AverageMeter, save_model, get_lr
 def main(load_path=None, train=True):
     print("Running...")
 
-    np.random.seed(12345)
-    torch.manual_seed(12345)
-    torch.cuda.manual_seed_all(12345)
+    #np.random.seed(12345)
+    #torch.manual_seed(12345)
+    #torch.cuda.manual_seed_all(12345)
 
-    cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = True
+    #cudnn.deterministic = True
+    #torch.backends.cudnn.benchmark = True
 
     # Change CSV for Training
-    train_data = EMM_LC_Fusion_Loader(scan_csv='Preprocessed-LIAO-L-Thresh-CSV\\train_file.csv',
-                                      desc_csv='Preprocessed-LIAO-L-Thresh-CSV\\train_descriptor.csv',
+    train_data = EMM_LC_Fusion_Loader(scan_csv='Preprocessed-LIAO-L-Thresh-CSV/train_file.csv',
+                                      desc_csv='Preprocessed-LIAO-L-Thresh-CSV/train_descriptor.csv',
                                       transform=transforms.Compose([RandomFlip(2, flip_probability=0.5),
                                                                     RandomAffine(degrees=(-20, 20, 0, 0, 0, 0),
                                                                                  default_pad_value=170),
                                                                     Resize((128, 128, 128))]))
-    test_data = EMM_LC_Fusion_Loader(scan_csv='Preprocessed-LIAO-L-Thresh-CSV\\test_file.csv',
-                                     desc_csv='Preprocessed-LIAO-L-Thresh-CSV\\test_descriptor.csv',
-                                     transform=transforms.Compose([RandomFlip(2, flip_probability=0.5),
-                                                                   RandomAffine(degrees=(-20, 20, 0, 0, 0, 0),
-                                                                                default_pad_value=170),
-                                                                   Resize((128, 128, 128))]))
+    test_data = EMM_LC_Fusion_Loader(scan_csv='Preprocessed-LIAO-L-Thresh-CSV/test_file.csv',
+                                     desc_csv='Preprocessed-LIAO-L-Thresh-CSV/test_descriptor.csv',
+                                     transform=transforms.Compose([Resize((128, 128, 128))]))
 
     print("Loaded Dataset")
 
@@ -54,7 +51,7 @@ def main(load_path=None, train=True):
     train_loader = DataLoader(train_data, sampler=w, batch_size=config.BATCH_SIZE, num_workers=config.NUM_WORKERS)
     test_loader = DataLoader(test_data, batch_size=config.BATCH_SIZE, num_workers=config.NUM_WORKERS)
 
-    model = AlignedXception(BatchNorm=nn.InstanceNorm3d, filters=[16, 32, 64, 128, 128, 256])
+    model = AlignedXception(BatchNorm=nn.BatchNorm3d, filters=[16, 32, 64, 128, 128, 256])
     model = model.to(device=config.DEVICE)
     model = model.float()
 
@@ -198,7 +195,7 @@ def test(model, loader, criterion, writer, epoch=0):
     plt.plot(fpr, tpr)
     plt.ylabel('True Positive Rate')
     plt.xlabel('False Positive Rate')
-    plt.savefig(config.DATA_DIR+f'\\models\\Unimodal\\ALX\\checkpoints\\AUC-ROC Curve\\Epoch-{epoch}-Curve.png')
+    plt.savefig(config.DATA_DIR+f'/models/Unimodal/ALX/checkpoints/AUC-ROC Curve/Epoch-{epoch}-Curve.png')
     plt.clf()
 
     writer.add_scalar('ROC_AUC', roc, epoch)

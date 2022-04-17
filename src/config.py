@@ -6,10 +6,10 @@ if torch.cuda.is_available():
 else:
     DEVICE = "cpu"
 
-DATA_DIR = r"E:\University of Gloucestershire\Year 4\Dissertation\Data"
-BATCH_SIZE = 3
-NUM_WORKERS = 4
-NUM_EPOCHS = 50
+DATA_DIR = r"/content/gdrive/MyDrive/Colab Notebooks/Project/Data"
+BATCH_SIZE = 32
+NUM_WORKERS = 2
+NUM_EPOCHS = 200
 IMAGE_SIZE = np.asarray((64, 64, 64))
 N_CLASSES = 1
 LR = 0.001

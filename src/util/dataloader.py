@@ -1,5 +1,5 @@
 from sys import path
-from src import config
+import config
 from torch.utils.data import Dataset
 import os
 import pandas as pd

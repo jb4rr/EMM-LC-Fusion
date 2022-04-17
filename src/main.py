@@ -33,18 +33,15 @@ def main(load_path=None, train=True):
     torch.backends.cudnn.benchmark = True
 
     # Change CSV for Training
-    train_data = EMM_LC_Fusion_Loader(scan_csv='Preprocessed-LIAO-L-Thresh-CSV\\train_file.csv',
-                                      desc_csv='Preprocessed-LIAO-L-Thresh-CSV\\train_descriptor.csv',
+    train_data = EMM_LC_Fusion_Loader(scan_csv='Preprocessed-LIAO-L-Thresh-CSV/train_file.csv',
+                                      desc_csv='Preprocessed-LIAO-L-Thresh-CSV/train_descriptor.csv',
                                       transform=transforms.Compose([RandomFlip(2, flip_probability=0.5),
                                                                     RandomAffine(degrees=(-20, 20, 0, 0, 0, 0),
                                                                                  default_pad_value=170),
                                                                     Resize((128, 128, 128))]))
-    test_data = EMM_LC_Fusion_Loader(scan_csv='Preprocessed-LIAO-L-Thresh-CSV\\test_file.csv',
-                                     desc_csv='Preprocessed-LIAO-L-Thresh-CSV\\test_descriptor.csv',
-                                     transform=transforms.Compose([RandomFlip(2, flip_probability=0.5),
-                                                                   RandomAffine(degrees=(-20, 20, 0, 0, 0, 0),
-                                                                                default_pad_value=170),
-                                                                   Resize((128, 128, 128))]))
+    test_data = EMM_LC_Fusion_Loader(scan_csv='Preprocessed-LIAO-L-Thresh-CSV/test_file.csv',
+                                     desc_csv='Preprocessed-LIAO-L-Thresh-CSV/test_descriptor.csv',
+                                     transform=transforms.Compose([Resize((128, 128, 128))]))
 
     print("Loaded Dataset")
 
@@ -67,7 +64,7 @@ def main(load_path=None, train=True):
     print("Training")
     if train:
         torch.cuda.empty_cache()
-        writer = SummaryWriter(config.DATA_DIR + '/models/Multimodal/EMM-LC-Fusion/logs/runs')
+        writer = SummaryWriter(config.DATA_DIR + '/models/Multimodal/EMM-LC-Fusion/N10/logs/runs')
         if load_path:
             checkpoint = torch.load(load_path)
             model.load_state_dict(checkpoint['model_state_dict'])
@@ -97,7 +94,7 @@ def main(load_path=None, train=True):
             is_best = False
             if flag:
                 # Only Improve Best Model after 10 epochs
-                if epoch > 10:
+                if epoch > 0:
                     is_best = best_f1 < f1
                     best_f1 = max(best_f1, f1)
 
@@ -112,11 +109,11 @@ def main(load_path=None, train=True):
 
             # Implement is best
             if is_best:
-                # Only Save after 10 epochs
-                if epoch > 10:
-                    save_model(state, model_path=config.DATA_DIR + "/models/Multimodal/EMM-LC-Fusion/checkpoints/Best.pth")
+                # Only Save after 0 epochs
+                if epoch >= 0:
+                    save_model(state, model_path=config.DATA_DIR + "/models/Multimodal/EMM-LC-Fusion/N10/checkpoints/Best.pth")
             else:
-                save_model(state, model_path=config.DATA_DIR + "/models/Multimodal/EMM-LC-Fusion/checkpoints/Last.pth")
+                save_model(state, model_path=config.DATA_DIR + "/models/Multimodal/EMM-LC-Fusion/N10/checkpoints/Last.pth")
 
             if lr <= (config.LR / (10 ** 4)):
                 print('Stopping training: learning rate is too small')
@@ -205,7 +202,7 @@ def test(model, loader, criterion, writer, epoch=0, log=True):
     plt.plot(fpr, tpr)
     plt.ylabel('True Positive Rate')
     plt.xlabel('False Positive Rate')
-    plt.savefig(config.DATA_DIR+f'\\models\\Multimodal\\EMM-LC-Fusion\\checkpoints\\AUC-ROC Curve\\Epoch-{epoch}-Curve.png')
+    plt.savefig(config.DATA_DIR+f'/models/Multimodal/EMM-LC-Fusion/N10/checkpoints/AUC-ROC Curve/Epoch-{epoch}-Curve.png')
     plt.clf()
     if log:
         writer.add_scalar('ROC_AUC', roc, epoch)
