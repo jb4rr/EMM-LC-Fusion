@@ -25,12 +25,12 @@ from util.utils import AverageMeter, save_model, get_lr
 def main(load_path=None, train=True):
     print("Running...")
 
-    np.random.seed(12345)
-    torch.manual_seed(12345)
-    torch.cuda.manual_seed_all(12345)
+    #np.random.seed(12345)
+    #torch.manual_seed(12345)
+    #torch.cuda.manual_seed_all(12345)
 
-    cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = True
+    #cudnn.deterministic = True
+    #torch.backends.cudnn.benchmark = True
 
     # Change CSV for Training
     train_data = EMM_LC_Fusion_Loader(scan_csv='Preprocessed-LIAO-L-Thresh-CSV/train_file.csv',
@@ -42,6 +42,7 @@ def main(load_path=None, train=True):
     test_data = EMM_LC_Fusion_Loader(scan_csv='Preprocessed-LIAO-L-Thresh-CSV/test_file.csv',
                                      desc_csv='Preprocessed-LIAO-L-Thresh-CSV/test_descriptor.csv',
                                      transform=transforms.Compose([Resize((128, 128, 128))]))
+
 
     print("Loaded Dataset")
 
@@ -64,7 +65,7 @@ def main(load_path=None, train=True):
     print("Training")
     if train:
         torch.cuda.empty_cache()
-        writer = SummaryWriter(config.DATA_DIR + '/models/Multimodal/EMM-LC-Fusion/N10/logs/runs')
+        writer = SummaryWriter(config.DATA_DIR + '/models/Multimodal/EMM-LC-Fusion/dae_param_old/N30/logs/runs')
         if load_path:
             checkpoint = torch.load(load_path)
             model.load_state_dict(checkpoint['model_state_dict'])
@@ -76,8 +77,6 @@ def main(load_path=None, train=True):
             test(model, test_loader, criterion, writer, epoch=epoch, log=False)
 
             return
-
-
 
         for epoch in range(epoch, config.NUM_EPOCHS):
             lr = get_lr(optimizer)
@@ -111,9 +110,9 @@ def main(load_path=None, train=True):
             if is_best:
                 # Only Save after 0 epochs
                 if epoch >= 0:
-                    save_model(state, model_path=config.DATA_DIR + "/models/Multimodal/EMM-LC-Fusion/N10/checkpoints/Best.pth")
+                    save_model(state, model_path=config.DATA_DIR + "/models/Multimodal/EMM-LC-Fusion/dae_param_old/N30/checkpoints/Best.pth")
             else:
-                save_model(state, model_path=config.DATA_DIR + "/models/Multimodal/EMM-LC-Fusion/N10/checkpoints/Last.pth")
+                save_model(state, model_path=config.DATA_DIR + "/models/Multimodal/EMM-LC-Fusion/dae_param_old/N30/checkpoints/Last.pth")
 
             if lr <= (config.LR / (10 ** 4)):
                 print('Stopping training: learning rate is too small')
@@ -202,7 +201,7 @@ def test(model, loader, criterion, writer, epoch=0, log=True):
     plt.plot(fpr, tpr)
     plt.ylabel('True Positive Rate')
     plt.xlabel('False Positive Rate')
-    plt.savefig(config.DATA_DIR+f'/models/Multimodal/EMM-LC-Fusion/N10/checkpoints/AUC-ROC Curve/Epoch-{epoch}-Curve.png')
+    plt.savefig(config.DATA_DIR+f'/models/Multimodal/EMM-LC-Fusion/dae_param_old/N30/checkpoints/AUC-ROC Curve/Epoch-{epoch}-Curve.png')
     plt.clf()
     if log:
         writer.add_scalar('ROC_AUC', roc, epoch)

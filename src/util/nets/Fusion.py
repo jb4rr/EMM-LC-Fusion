@@ -6,7 +6,7 @@ from .AlignedXception import AlignedXception
 
 
 class Fusion(nn.Module):
-    def __init__(self, dae_model=config.DATA_DIR+'/models/Unimodal/DAE/N10/checkpoints/Best.pth',
+    def __init__(self, dae_model=config.DATA_DIR+'/models/Unimodal/DAE/dae_param_old/N30/checkpoints/Last.pth',
                         alx_model=config.DATA_DIR+'/models/Unimodal/ALX/checkpoints/Best.pth'):
         super(Fusion, self).__init__()
 
@@ -31,7 +31,7 @@ class Fusion(nn.Module):
         self.ALX.eval()
 
         # Combination
-        self._fc0 = nn.Linear(10240 + 740, filters[-1]) #1480 where N = 20
+        self._fc0 = nn.Linear(75776 + 2220, filters[-1]) #1480 where N = 20
         self._dropout = nn.Dropout(0.2)
         self._fc = nn.Linear(filters[-1], 2)
         self.relu = nn.ReLU(inplace=True)
@@ -49,7 +49,7 @@ class Fusion(nn.Module):
         #y = torch.squeeze(y, dim=1)
 
         # Combination via concatenation
-        x = self.relu(self._fc0(torch.cat((x2, x3, y), dim=1)))
+        x = self.relu(self._fc0(torch.cat((x1, x2, x3, y), dim=1)))
         x = self._dropout(x)
         x = self._fc(x)
         return x

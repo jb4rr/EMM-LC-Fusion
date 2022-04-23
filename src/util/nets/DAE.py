@@ -13,7 +13,7 @@ class DenoisingAutoEncoder(nn.Module):
     def __init__(self):
         super(DenoisingAutoEncoder, self).__init__()
         f = config.NUM_FEATURES
-        n = [2,5,10]
+        n = [10,20,30]
         self.encoder = nn.Sequential(
             # Dropout Layer == Input Noise
             nn.Dropout(0.2),
