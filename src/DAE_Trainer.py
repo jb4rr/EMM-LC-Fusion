@@ -37,7 +37,7 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=config.LR)
 
     # Train Model
-    writer = SummaryWriter(config.DATA_DIR+f"/models/Unimodal/DAE/{config.DAE_NUM}/logs")
+    writer = SummaryWriter(config.DATA_DIR+f"/models/Unimodal/DAE/dae_param_new/{config.DAE_NUM}/logs")
     cuda.empty_cache()
     train(model, criterion, optimizer, train_loader, test_loader, writer)
 
@@ -67,7 +67,7 @@ def train(model, criterion, optimizer, loader, test_loader, writer):
             loss = criterion(scores, data)
 
             # Add L1 Regularization Term to Prevent Creating an Identity Function
-            l1_lambda = 0.001
+            l1_lambda = 0.0001
             l1_norm = sum(p.abs().sum() for p in model.parameters())
 
             loss = loss + l1_lambda * l1_norm
@@ -109,9 +109,9 @@ def train(model, criterion, optimizer, loader, test_loader, writer):
             'best_f1': best_f1}
 
         if is_best:
-            save_model(state, model_path=config.DATA_DIR+f"/models/Unimodal/DAE/{config.DAE_NUM}/checkpoints/Best.pth")
+            save_model(state, model_path=config.DATA_DIR+f"/models/Unimodal/DAE/dae_param_new/{config.DAE_NUM}/checkpoints/Best.pth")
         else:
-            save_model(state, model_path=config.DATA_DIR+f"/models/Unimodal/DAE/{config.DAE_NUM}/checkpoints/Last.pth")
+            save_model(state, model_path=config.DATA_DIR+f"/models/Unimodal/DAE/dae_param_new/{config.DAE_NUM}/checkpoints/Last.pth")
         epoch_loss.reset()
 
 
