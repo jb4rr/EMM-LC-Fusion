@@ -147,7 +147,7 @@ if __name__ == '__main__':
     filters = [16, 32, 64, 128, 128, 256]
     model = AlignedXception(BatchNorm=nn.InstanceNorm3d, filters=filters)
     input = torch.rand(1, 1, 128, 128, 128)
-    out1, out2, features = model(input)
+    out1, out2,  = model(input)
     print(features.size())
     print(out1.size())
     print(out2.size())
