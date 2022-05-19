@@ -76,7 +76,7 @@ def main(load_path=None, train=True):
             test(model, test_loader, criterion, writer, epoch=epoch, log=False)
 
             return
-        writer = SummaryWriter(config.DATA_DIR + '/models/Multimodal/EMM-LC-Fusion/no_dae/75K-CDE-Linear/logs/runs')
+        writer = SummaryWriter(config.DATA_DIR + '/models/Multimodal/Simple-Fusion-ST/logs/runs')
         for epoch in range(epoch, config.NUM_EPOCHS):
             lr = get_lr(optimizer)
             print(f"Epoch {epoch} with LR == {lr}")
@@ -109,9 +109,9 @@ def main(load_path=None, train=True):
             if is_best:
                 # Only Save after 0 epochs
                 if epoch >= 0:
-                    save_model(state, model_path=config.DATA_DIR + "/models/Multimodal/EMM-LC-Fusion/no_dae/75K-CDE-Linear/checkpoints/Best.pth")
+                    save_model(state, model_path=config.DATA_DIR + "/models/Multimodal/Simple-Fusion-ST/checkpoints/Best.pth")
             else:
-                save_model(state, model_path=config.DATA_DIR + "/models/Multimodal/EMM-LC-Fusion/no_dae/75K-CDE-Linear/checkpoints/Last.pth")
+                save_model(state, model_path=config.DATA_DIR + "/models/Multimodal/Simple-Fusion-ST/checkpoints/Last.pth")
 
             if lr <= (config.LR / (10 ** 4)):
                 print('Stopping training: learning rate is too small')
@@ -202,7 +202,7 @@ def test(model, loader, criterion, writer, epoch=0, log=True):
     plt.plot(fpr, tpr)
     plt.ylabel('True Positive Rate')
     plt.xlabel('False Positive Rate')
-    plt.savefig(config.DATA_DIR+f'/models/Multimodal/EMM-LC-Fusion/no_dae/75K-CDE-Linear/checkpoints/AUC-ROC Curve/Epoch-{epoch}-Curve.png')
+    plt.savefig(config.DATA_DIR+f'/models/Multimodal/Simple-Fusion-ST/checkpoints/AUC-ROC Curve/Epoch-{epoch}-Curve.png')
     plt.clf()
     if log:
         writer.add_scalar('ROC_AUC', roc, epoch)

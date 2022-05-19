@@ -32,7 +32,7 @@ class Fusion(nn.Module):
         self.ALX.eval()
 
         # Combination
-        self._fc0 = nn.Linear(75776 + 512, filters[-1]) #1480 where N = 20
+        self._fc0 = nn.Linear(2048 + 512, filters[-1]) #1480 where N = 20
         self._dropout = nn.Dropout(0.2)
         self._fc = nn.Linear(filters[-1], 2)
         self.relu = nn.ReLU(inplace=True)
@@ -50,7 +50,7 @@ class Fusion(nn.Module):
         y = torch.squeeze(y, dim=1)
 
         # Combination via concatenation
-        x = self.relu(self._fc0(torch.cat((x1, x2, x3, y), dim=1)))
+        x = self.relu(self._fc0(torch.cat((x3, y), dim=1)))
         x = self._dropout(x)
         x = self._fc(x)
         return x

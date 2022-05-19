@@ -305,7 +305,7 @@ class LiaoTransform(object):
         # -------------------------------------------------------------------------------------------------------#
         #                                         RESIZE OF SCAN Factor=0.25
         logging.debug(f"Scan Size: {self.scan.get_fdata().shape}") # \n   Header: {self.scan.header.get_zooms()}")
-        self.scan = resample_img(self.scan, target_affine=self.scan.affine/0.5, interpolation='nearest')
+            self.scan = resample_img(self.scan, target_affine=self.scan.affine/0.5, interpolation='nearest')
         logging.debug(f"Resized to {self.scan.get_fdata().shape}") # \n   Header: {self.scan.header.get_zooms()}")
         # -------------------------------------------------------------------------------------------------------#
         #                                           GET SLICES
