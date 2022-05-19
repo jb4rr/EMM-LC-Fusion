@@ -18,8 +18,8 @@ from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import roc_auc_score, average_precision_score, f1_score, roc_curve
 from util.dataloader import EMM_LC_Fusion_Loader
 
-from util.nets.Fusion import Fusion
-from util.utils import AverageMeter, save_model, get_lr, plot_confusion_matrix
+from util.nets.AlignedXception import AlignedXception
+from util.utils import AverageMeter, save_model, get_lr
 
 
 def main(load_path=None, train=True):
@@ -43,7 +43,6 @@ def main(load_path=None, train=True):
                                      desc_csv='Preprocessed-LIAO-L-Thresh-CSV/test_descriptor.csv',
                                      transform=transforms.Compose([Resize((128, 128, 128))]))
 
-
     print("Loaded Dataset")
 
     # Over Sampling due to lack of entries with cancer : Limitation -> May Produce Over fitting
@@ -52,7 +51,7 @@ def main(load_path=None, train=True):
     train_loader = DataLoader(train_data, sampler=w, batch_size=config.BATCH_SIZE, num_workers=config.NUM_WORKERS)
     test_loader = DataLoader(test_data, batch_size=config.BATCH_SIZE, num_workers=config.NUM_WORKERS)
 
-    model = Fusion()
+    model = AlignedXception(BatchNorm=nn.BatchNorm3d, filters=[16, 32, 64, 128, 128, 256])
     model = model.to(device=config.DEVICE)
     model = model.float()
 
@@ -65,18 +64,16 @@ def main(load_path=None, train=True):
     print("Training")
     if train:
         torch.cuda.empty_cache()
-
         if load_path:
             checkpoint = torch.load(load_path)
-            model.load_state_dict(checkpoint['state_dict'])
-            optimizer.load_state_dict(checkpoint['optimizer'])
+            model.load_state_dict(checkpoint['model_state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             epoch = checkpoint['epoch']
             best_f1 = checkpoint['f1']
-            writer = None
-            test(model, test_loader, criterion, writer, epoch=epoch, log=False)
 
-            return
-        writer = SummaryWriter(config.DATA_DIR + '/models/Multimodal/Simple-Fusion-ST/logs/runs')
+            model.load_state_dict(checkpoint['model_state_dict'])
+
+        writer = SummaryWriter(config.DATA_DIR + '/models/Unimodal/ALX/logs/runs')
         for epoch in range(epoch, config.NUM_EPOCHS):
             lr = get_lr(optimizer)
             print(f"Epoch {epoch} with LR == {lr}")
@@ -92,7 +89,7 @@ def main(load_path=None, train=True):
             is_best = False
             if flag:
                 # Only Improve Best Model after 10 epochs
-                if epoch > 0:
+                if epoch > 10:
                     is_best = best_f1 < f1
                     best_f1 = max(best_f1, f1)
 
@@ -107,11 +104,11 @@ def main(load_path=None, train=True):
 
             # Implement is best
             if is_best:
-                # Only Save after 0 epochs
-                if epoch >= 0:
-                    save_model(state, model_path=config.DATA_DIR + "/models/Multimodal/Simple-Fusion-ST/checkpoints/Best.pth")
+                # Only Save after 10 epochs
+                if epoch > 10:
+                    save_model(state, model_path=config.DATA_DIR + "/models/Unimodal/ALX/checkpoints/Best.pth")
             else:
-                save_model(state, model_path=config.DATA_DIR + "/models/Multimodal/Simple-Fusion-ST/checkpoints/Last.pth")
+                save_model(state, model_path=config.DATA_DIR + "/models/Unimodal/ALX/checkpoints/Last.pth")
 
             if lr <= (config.LR / (10 ** 4)):
                 print('Stopping training: learning rate is too small')
@@ -124,16 +121,15 @@ def train_model(epoch, model, optim, criterion, train_loader, writer):
     print_stats = 5  # Every 5 Percent Print Stats
 
     scaler = torch.cuda.amp.GradScaler()
-
+    torch.autograd.set_detect_anomaly(True)
     for batch_idx, sample in enumerate(train_loader):
         data = sample['scan'].to(device=config.DEVICE).float()
         targets = sample['label'].to(device=config.DEVICE).float()
-        descriptor = sample['descriptor'].to(device=config.DEVICE).float()
         targets = torch.stack([1 - targets, targets], dim=1)
         optim.zero_grad()
         # Forward Pass
         with torch.cuda.amp.autocast():
-            scores = model(data, descriptor)
+            scores, _ = model(data)
             loss = criterion(scores, targets)
 
         # Backward Pass
@@ -154,12 +150,12 @@ def train_model(epoch, model, optim, criterion, train_loader, writer):
                 time.strftime("%H:%M:%S"), (batch_idx + 1),
                 (len(train_loader)), 100. * (batch_idx + 1) / (len(train_loader)),
                 loss.item()))
-            writer.flush()
+
     print('--- Train: \tLoss: {:.6f} ---'.format(epoch_loss.avg))
     return epoch_loss.avg
 
 
-def test(model, loader, criterion, writer, epoch=0, log=True):
+def test(model, loader, criterion, writer, epoch=0):
     model.eval()
     epoch_loss = AverageMeter()
     count, correct = 0, 0
@@ -168,11 +164,10 @@ def test(model, loader, criterion, writer, epoch=0, log=True):
     for batch_idx, sample in enumerate(loader):
         data = sample['scan'].to(device=config.DEVICE).float()
         target = sample['label'].to(device=config.DEVICE).float()
-        descriptor = sample['descriptor'].to(device=config.DEVICE).float()
         labels.extend(sample['label'].tolist())
 
         with torch.no_grad():
-            out = model(data, descriptor)
+            out, _ = model(data)
         loss = criterion(out, torch.stack([1 - target, target], dim=1))
         epoch_loss.update(loss.item())
 
@@ -185,31 +180,29 @@ def test(model, loader, criterion, writer, epoch=0, log=True):
         correct += (pred * target).sum()
 
     print(f"Epoch {epoch}")
-    print('Val:\n  Loss: {:.6f} ---'.format(epoch_loss.avg))
+    print('Val:\n     Loss: {:.6f} ---'.format(epoch_loss.avg))
 
     # Metrics
-    #plot_confusion_matrix(labels, predictions)
-
     roc = roc_auc_score(labels, scores)
     fpr, tpr, _ = roc_curve(labels, scores)
     ap = average_precision_score(labels, scores)
     f1 = f1_score(labels, predictions)
     accuracy = sum(1 for x, y in zip(labels, predictions) if x == y) / len(labels)
 
-    print(f"ROC_AUC: {roc} \n     AP: {ap} \n     F1: {f1}\n ACCURACY: {accuracy}")
+    print(f"  ROC_AUC:   {roc} \n     AP: {ap} \n       F1: {f1}\n ACCURACY: {accuracy}")
     print("___________________________")
 
     plt.plot(fpr, tpr)
     plt.ylabel('True Positive Rate')
     plt.xlabel('False Positive Rate')
-    plt.savefig(config.DATA_DIR+f'/models/Multimodal/Simple-Fusion-ST/checkpoints/AUC-ROC Curve/Epoch-{epoch}-Curve.png')
+    plt.savefig(config.DATA_DIR+f'/models/Unimodal/ALX/checkpoints/AUC-ROC Curve/Epoch-{epoch}-Curve.png')
     plt.clf()
-    if log:
-        writer.add_scalar('ROC_AUC', roc, epoch)
-        writer.add_scalar('F1', f1, epoch)
-        writer.add_scalar('Average Precision', ap, epoch)
-        writer.add_scalar('Validation Loss', epoch_loss.avg, epoch)
-        writer.flush()
+
+    writer.add_scalar('ROC_AUC', roc, epoch)
+    writer.add_scalar('F1', f1, epoch)
+    writer.add_scalar('Average Precision', ap, epoch)
+    writer.add_scalar('Validation Loss', epoch_loss.avg, epoch)
+
     flag = True
     if count == 0 or count == len(loader.dataset):
         flag = False
